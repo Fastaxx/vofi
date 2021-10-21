@@ -8,5 +8,3 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
 add_subdirectory(src)
 
-install(FILES LICENCE.md DESTINATION share/licenses/libvofi)
-
