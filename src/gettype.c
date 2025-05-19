@@ -293,7 +293,7 @@ vofi_int vofi_cell_type_4D(integrand impl_func, vofi_void_cptr par,
   hm = MAX(hm, h0[2]);
   hm = MAX(hm, h0[3]);
   hm = 0.5*hm;
-  fth = fgradmod*hm/sqrt(3.);  /* 4D version uses sqrt(3) */
+  fth = fgradmod*hm*sqrt(3.)/2;  /* 4D version uses sqrt(3) */
   
   /* Check if cell is full or empty */
   if (np0*nm0 == 0) {    
