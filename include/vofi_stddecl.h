@@ -56,7 +56,7 @@
 #define Sq(a) ((a)*(a))
 #define Sq2(a) (a[0]*a[0] + a[1]*a[1])
 #define Sq3(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2])
-#define Sq4(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2] + a[3]*a[3])  // 4D 
+#define Sq4(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2] + a[3]*a[3])  // 4D implementation
 #define Sqd3(a,b) ((a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1])+(a[2]-b[2])*(a[2]-b[2]))
 #define SHFT4(a,b,c,d)  (a)=(b); (b)=(c); (c)=(d)
 #define CPSF(s,t,f,g) (s)=(t); (f)=(g)
@@ -70,11 +70,16 @@
 #define NEAR_EDGE_RATIO 2.0e-02
 #define MAX_ITER_ROOT 15
 #define MAX_ITER_MINI 50  
-#define NDIM   4
+#define NDIM   4  // 4D implementation
 #define NVER   4
 #define NSE    2
 #define NSEG  10
 #define NGLM  20
+
+#define EPS_FUNC 1.0e-08      // Used for derivative calculation
+#define EPS_GRAD 1.0e-10      // Used for checking near-zero derivatives
+#define MAX_ITER 20           // Maximum Newton iterations
+#define MAX_ITER_BISEC 15     // Maximum bisection iterations
 
 typedef double vofi_real;
 typedef const double vofi_creal;
@@ -135,6 +140,61 @@ typedef struct {
   vofi_real ht0[NGLM+2];
   vofi_real htp[NGLM+2];
 } len_data; 
+
+/* 4D-specific constants */
+#define NVER4D   16    /* Number of vertices in a 4D hypercube */
+#define MAX_TET  100   /* Maximum number of tetrahedra in a hypersurface triangulation */
+#define MAX_VERT 200   /* Maximum number of vertices in a hypersurface triangulation */
+
+/* len4d_data structure:
+   np0: actual number of internal nodes,
+   f_sign: (+1/-1) --> local height stems from (lower/upper) boundary,
+   NGLM+2: maximum number of internal nodes + boundary nodes,
+   xt0: nodes coordinates on the 3D hyperplane (3D array),
+   ht0: local height at these coordinates,
+   htp: local derivative along the quaternary direction           */
+typedef struct {
+  vofi_int np0;
+  vofi_int f_sign;
+  vofi_real xt0[NGLM+2][NGLM+2][NGLM+2];  /* 3D grid of positions */
+  vofi_real ht0[NGLM+2][NGLM+2][NGLM+2];  /* Heights at each position */
+  vofi_real htp[NGLM+2][NGLM+2][NGLM+2];  /* Derivatives at each position */
+} len4d_data;
+
+/* tetra4d_data structure:
+   Used for triangulating 3D hypersurfaces in 4D space
+   ntet: number of tetrahedra,
+   nverts: number of vertices,
+   verts: coordinates of vertices [vertex_index][x,y,z,w],
+   tets: vertex indices for each tetrahedron [tet_index][v1,v2,v3,v4] */
+typedef struct {
+  vofi_int ntet;
+  vofi_int nverts;
+  vofi_real verts[MAX_VERT][4];
+  vofi_int tets[MAX_TET][4];
+} tetra4d_data;
+
+/* dir4d_data structure:
+   Extension of dir_data for 4D with additional indices
+   ind1,ind2,ind3: indices in {0,1} to locate vertices in 4D hyperfaces
+   swt1,swt2,swt3: switches to control gradient components in 4D  */
+typedef struct { 
+  int ind1; int ind2; int ind3;               
+  int swt1; int swt2; int swt3; 
+  int consi;    
+} dir4d_data;
+
+/* min4d_data structure:
+   Extended version of min_data with documentation for 4D context
+   Additional field isc4: specific to 4D intersection structure */
+typedef struct {
+  vofi_real xval[NDIM]; 
+  vofi_real fval; 
+  vofi_real sval; 
+  vofi_int isc[NDIM];
+  vofi_int isc4;   /* 4D-specific intersection info */ 
+  vofi_int ipt;
+} min4d_data;
 
 /*------------ function prototypes ------------*/
 
@@ -280,5 +340,27 @@ void vofi_edge_points(integrand,vofi_void_cptr,vofi_creal [],
                       vofi_creal [],len_data [],vofi_cint [],
                       vofi_cint ,vofi_int [],vofi_int []);
 vofi_real vofi_triarea(vofi_creal [],vofi_creal [],vofi_creal []);
+
+/* functions for 4D hypercube cell type detection and coordinate ordering */
+vofi_int vofi_cell_type_4D(integrand, vofi_void_cptr, vofi_creal [], vofi_creal []);
+vofi_int vofi_order_dirs_4D(integrand, vofi_void_cptr, vofi_creal [], vofi_creal [],
+                           vofi_real [], vofi_real [], vofi_real [], vofi_real [],
+                           vofi_real [][NSE][NSE][NSE], min4d_data []);
+
+vofi_int vofi_check_boundary_hypercube(integrand, vofi_void_cptr, vofi_creal [],
+                                     vofi_creal [], vofi_real [][NSE][NSE][NSE],
+                                     min4d_data [], vofi_int [][NSE][NSE][NSE]);
+
+/* 4D extension function declarations */
+dir_data vofi_check_face_consistency_3D(integrand, vofi_void_cptr, vofi_creal [],
+                                      vofi_creal [], vofi_creal [], vofi_creal [],
+                                      vofi_creal [], vofi_creal []);
+
+/* Find minimum on 3D face of 4D hypercube */
+vofi_int vofi_get_face_min_3D(integrand, vofi_void_cptr, 
+                            vofi_creal [], vofi_creal [],
+                            vofi_creal [], vofi_creal [],
+                            vofi_creal [], vofi_creal [],
+                            min_data *, dir_data);
 
 #endif

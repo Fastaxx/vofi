@@ -58,6 +58,10 @@ vofi_int vofi_get_cell_type(integrand impl_func,vofi_void_cptr par,
     icc = vofi_cell_type_3D(impl_func,par,x0,h0);
   }
   /* - */
+  else if (ndim0 == 4) {
+    x0[0] = xin[0]; x0[1] = xin[1]; x0[2] = xin[2]; x0[3] = xin[3];
+    icc = vofi_cell_type_4D(impl_func,par,x0,h0);
+  }
   else {                                                           
     printf(" EXIT: wrong value of variable ndim0! \n");
     exit(1);
@@ -214,6 +218,113 @@ vofi_int vofi_cell_type_3D(integrand impl_func,vofi_void_cptr par,
       check_dir = vofi_check_boundary_surface(impl_func,par,x0,h0,f0,xfsp,n0);
     
     /* - */
+    if (check_dir < 0) {
+      if (nm0 > 0) 
+        icc = 1;
+      else 
+        icc = 0;
+    }
+  }
+  
+  return icc;
+}
+
+/* -------------------------------------------------------------------------- */
+vofi_int vofi_cell_type_4D(integrand impl_func, vofi_void_cptr par,
+                          vofi_creal x0[], vofi_creal h0[])
+{
+  vofi_int n0[NSE][NSE][NSE][NSE], i, j, k, l;
+  vofi_int np0, nm0, icc, check_dir, nmax0;
+  vofi_real f0[NSE][NSE][NSE][NSE], x1[NDIM], fgrad[NDIM];
+  vofi_real f0mod, fgradmod, fgradsq, hm, fth;
+  vofi_creal MIN_GRAD=1.0e-04;
+  min4d_data xfsp[4] = {{{0.,0.,0.,0.},0.,0.,{0,0,0,0},0,0},
+                      {{0.,0.,0.,0.},0.,0.,{0,0,0,0},0,0},
+                      {{0.,0.,0.,0.},0.,0.,{0,0,0,0},0,0},
+                      {{0.,0.,0.,0.},0.,0.,{0,0,0,0},0,0}};
+  
+  /* Initialize counters */
+  np0 = nm0 = 0;
+  icc = check_dir = -1;
+  nmax0 = 16;  /* 16 vertices in a 4D hypercube */
+
+  /* Sample the function at all vertices */
+  for (i=0; i<NSE; i++)
+    for (j=0; j<NSE; j++) 
+      for (k=0; k<NSE; k++)
+        for (l=0; l<NSE; l++) {
+          x1[0] = x0[0] + i*h0[0];
+          x1[1] = x0[1] + j*h0[1];
+          x1[2] = x0[2] + k*h0[2];
+          x1[3] = x0[3] + l*h0[3];
+          f0[i][j][k][l] = impl_func(x1,par);
+          if (f0[i][j][k][l] > 0.)  
+            np0++;
+          else if (f0[i][j][k][l] < 0.)  
+            nm0++;
+        }
+  
+  /* Calculate gradient components - 4D version */
+  fgrad[0] = 0.125*( (f0[1][1][1][1] + f0[1][0][1][1] + f0[1][1][0][1] + f0[1][0][0][1] +
+                     f0[1][1][1][0] + f0[1][0][1][0] + f0[1][1][0][0] + f0[1][0][0][0]) -
+                    (f0[0][1][1][1] + f0[0][0][1][1] + f0[0][1][0][1] + f0[0][0][0][1] +
+                     f0[0][1][1][0] + f0[0][0][1][0] + f0[0][1][0][0] + f0[0][0][0][0]) )/h0[0];
+  
+  fgrad[1] = 0.125*( (f0[1][1][1][1] + f0[0][1][1][1] + f0[1][0][1][1] + f0[0][0][1][1] +
+                     f0[1][1][0][1] + f0[0][1][0][1] + f0[1][0][0][1] + f0[0][0][0][1]) -
+                    (f0[1][1][1][0] + f0[0][1][1][0] + f0[1][0][1][0] + f0[0][0][1][0] +
+                     f0[1][1][0][0] + f0[0][1][0][0] + f0[1][0][0][0] + f0[0][0][0][0]) )/h0[1];
+                     
+  fgrad[2] = 0.125*( (f0[1][1][1][1] + f0[0][1][1][1] + f0[1][0][1][1] + f0[0][0][1][1] +
+                     f0[1][1][1][0] + f0[0][1][1][0] + f0[1][0][1][0] + f0[0][0][1][0]) -
+                    (f0[1][1][0][1] + f0[0][1][0][1] + f0[1][0][0][1] + f0[0][0][0][1] +
+                     f0[1][1][0][0] + f0[0][1][0][0] + f0[1][0][0][0] + f0[0][0][0][0]) )/h0[2];
+                     
+  fgrad[3] = 0.125*( (f0[1][1][1][1] + f0[0][1][1][1] + f0[1][1][0][1] + f0[0][1][0][1] +
+                     f0[1][0][1][1] + f0[0][0][1][1] + f0[1][0][0][1] + f0[0][0][0][1]) -
+                    (f0[1][1][1][0] + f0[0][1][1][0] + f0[1][1][0][0] + f0[0][1][0][0] +
+                     f0[1][0][1][0] + f0[0][0][1][0] + f0[1][0][0][0] + f0[0][0][0][0]) )/h0[3];
+  
+  fgradsq = Sq4(fgrad);
+  fgradmod = MAX(sqrt(fgradsq), MIN_GRAD);
+  
+  /* Calculate threshold using max cell dimension */
+  hm = MAX(h0[0], h0[1]);
+  hm = MAX(hm, h0[2]);
+  hm = MAX(hm, h0[3]);
+  hm = 0.5*hm;
+  fth = fgradmod*hm/sqrt(3.);  /* 4D version uses sqrt(3) */
+  
+  /* Check if cell is full or empty */
+  if (np0*nm0 == 0) {    
+    np0 = nm0 = 0;
+    for (i=0; i<NSE; i++)
+      for (j=0; j<NSE; j++) 
+        for (k=0; k<NSE; k++)
+          for (l=0; l<NSE; l++) {
+            f0mod = fabs(f0[i][j][k][l]); 
+            if (f0mod > fth) {
+              n0[i][j][k][l] = 0;
+              if (f0[i][j][k][l] < 0.)
+                nm0++;
+              else
+                np0++;
+            }
+            else
+              n0[i][j][k][l] = 1;
+          }  
+
+    /* Determine cell type: full, empty, or cut */
+    if (nm0 == nmax0)                          
+      icc = 1;
+    else if (np0 == nmax0) 
+      icc = 0;
+
+    /* Check boundaries for potential intersections */
+    if (icc < 0)
+      check_dir = vofi_check_boundary_hypercube(impl_func, par, x0, h0, f0, xfsp, n0);
+    
+    /* If boundary check finds no intersection, classify based on sign */
     if (check_dir < 0) {
       if (nm0 > 0) 
         icc = 1;
