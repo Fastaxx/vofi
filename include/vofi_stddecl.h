@@ -52,10 +52,11 @@
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
-#define SGN0P(a) ((a<0) ? -1 : 1)
+#define SGN0P(a) (((a)<0) ? -1 : 1)
 #define Sq(a) ((a)*(a))
 #define Sq2(a) (a[0]*a[0] + a[1]*a[1])
 #define Sq3(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2])
+#define Sq4(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2] + a[3]*a[3])  // 4D 
 #define Sqd3(a,b) ((a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1])+(a[2]-b[2])*(a[2]-b[2]))
 #define SHFT4(a,b,c,d)  (a)=(b); (b)=(c); (c)=(d)
 #define CPSF(s,t,f,g) (s)=(t); (f)=(g)
@@ -69,7 +70,7 @@
 #define NEAR_EDGE_RATIO 2.0e-02
 #define MAX_ITER_ROOT 15
 #define MAX_ITER_MINI 50  
-#define NDIM   3
+#define NDIM   4
 #define NVER   4
 #define NSE    2
 #define NSEG  10
