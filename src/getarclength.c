@@ -43,13 +43,18 @@
  * -------------------------------------------------------------------------- */
 vofi_real vofi_interface_length(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_creal pdir[],
-                         vofi_creal sdir[],len_data xhhp[],vofi_cint ipf)
+                         vofi_creal sdir[],len_data xhhp[],vofi_cint ipf,
+                         vofi_real if_centroid[])
 {
   FILE *fp;
   vofi_int i,j,k,npt,f_sign,it0,nseg,j0,j1,j2,j3;
   vofi_real hp,a1,a2,b1,b2,ratio,xm,hm,hpm,arc,d1,d2,hsum;
   vofi_real dx1,dx2,dx12,dc1,dc2,x0b,h0b,hpb,xc,hc,xl,hl,xr,hr;
   vofi_real x20[NDIM],x21[NDIM],s0[4];
+
+  // Add variables for centroid calculation
+  vofi_real weighted_centroid[NDIM] = {0.0, 0.0};
+  vofi_real seg_centroid[NDIM], seg_length;
 
   if (ipf == 1)
     fp = fopen("arcline.dat","a");    
@@ -150,6 +155,45 @@ vofi_real vofi_interface_length(integrand impl_func,vofi_void_cptr par,
         tecplot_arcline(x0,pdir,sdir,xc,hc,hp,f_sign,fp);   
         tecplot_arcline(x0,pdir,sdir,xr,hr,hp,f_sign,fp);
       }      
+      
+      // Add centroid calculation after each arc segment is computed
+      if (if_centroid != NULL) {
+        // Calculate first segment length and add weighted contribution
+        seg_length = sqrt(d1);
+        if (seg_length > 0.0) {
+          // Fix for coordinate transformation - handle all orientations
+          if (f_sign < 0) {
+            // Adjust conversion based on interface orientation
+            seg_centroid[0] = x0[0] + sdir[0]*xc + pdir[0]*(hp-hc);
+            seg_centroid[1] = x0[1] + sdir[1]*xc + pdir[1]*(hp-hc);
+          } else {
+            seg_centroid[0] = x0[0] + sdir[0]*xc + pdir[0]*hc;
+            seg_centroid[1] = x0[1] + sdir[1]*xc + pdir[1]*hc;
+          }
+          
+          // Add weighted contribution to centroid
+          weighted_centroid[0] += seg_centroid[0] * seg_length;
+          weighted_centroid[1] += seg_centroid[1] * seg_length;
+        }
+        
+        // Calculate second segment length and add weighted contribution
+        seg_length = sqrt(d2);
+        if (seg_length > 0.0) {
+          // Fix for coordinate transformation - handle all orientations
+          if (f_sign < 0) {
+            // Adjust conversion based on interface orientation
+            seg_centroid[0] = x0[0] + sdir[0]*xc + pdir[0]*(hp-hc);
+            seg_centroid[1] = x0[1] + sdir[1]*xc + pdir[1]*(hp-hc);
+          } else {
+            seg_centroid[0] = x0[0] + sdir[0]*xc + pdir[0]*hc;
+            seg_centroid[1] = x0[1] + sdir[1]*xc + pdir[1]*hc;
+          }
+          // Add weighted contribution to centroid
+          weighted_centroid[0] += seg_centroid[0] * seg_length;
+          weighted_centroid[1] += seg_centroid[1] * seg_length;
+        }
+      }
+
     
       x0b = xm;
       h0b = hm;
@@ -162,6 +206,13 @@ vofi_real vofi_interface_length(integrand impl_func,vofi_void_cptr par,
       xm = 0.5*(xl+xr);
     }
   }
+
+  // After all segments are processed, normalize the centroid
+  if (if_centroid != NULL && arc > 0.0) {
+    if_centroid[0] = weighted_centroid[0] / arc;
+    if_centroid[1] = weighted_centroid[1] / arc;
+  }
+
   if (ipf == 1)
     fclose(fp);
   

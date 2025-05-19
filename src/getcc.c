@@ -84,8 +84,20 @@ vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
       for (i=0;i<NSE;i++)
         xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i];
     }
-    if (nex[1] > 0) {      
-      xex[3] = vofi_interface_length(impl_func,par,x0,h0,pdir,sdir,xhp,nvis[1]);
+    // Modify the interface length calculation to also compute centroid if requested
+    if (nex[1] > 0) {
+      if (nex[2] > 0 && xex != NULL) {
+        // Calculate interface centroid
+        vofi_real if_centroid[2] = {0.0, 0.0};
+        xex[3] = vofi_interface_length(impl_func, par, x0, h0, pdir, sdir, xhp, nvis[1], if_centroid);
+        
+        // Store interface centroid in xex array
+        xex[5] = if_centroid[0];  // x-coordinate of interface centroid
+        xex[6] = if_centroid[1];  // y-coordinate of interface centroid
+      } else {
+        // Original call without centroid calculation
+        xex[3] = vofi_interface_length(impl_func, par, x0, h0, pdir, sdir, xhp, nvis[1], NULL);
+      }
     }
   }
   else if (ndim0 == 3) {                                          /* - */
@@ -113,8 +125,18 @@ vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
         xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i] + 
                  centroid[2]*tdir[i];
     }
-    if (nex[1] > 0)
-      xex[3] = centroid[3];
+    // For interface area and centroid, get value already calculated by vofi_get_volume
+    if (nex[1] > 0) {  // If interface area is requested
+      xex[3] = centroid[3];  // Interface area was stored in centroid[3]
+      
+      // If interface centroid calculation was requested
+      if (nex[2] > 0 && xex != NULL) {
+        // Extract interface centroid from centroid[4], centroid[5], centroid[6]
+        xex[5] = centroid[4];  // x-coordinate of interface centroid
+        xex[6] = centroid[5];  // y-coordinate of interface centroid
+        xex[7] = centroid[6];  // z-coordinate of interface centroid
+      }
+    }
   }
   else {                                                          /* - */
     printf(" EXIT: wrong value of variable ndim0! \n");

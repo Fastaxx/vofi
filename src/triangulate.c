@@ -50,7 +50,7 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_creal xt[],
                          vofi_creal pdir[],vofi_creal sdir[],vofi_creal tdir[],
                          len_data xhpn[],len_data xhpo[],vofi_cint k,
-                         vofi_cint nexpt,vofi_cint ipf)
+                         vofi_cint nexpt,vofi_cint ipf, vofi_real if_centroid[])
 {
   vofi_int i,j,nsec,npn,npo,f_sign,it0,km;
   vofi_int djl,djc,djr,npa,nmin,nmax;
@@ -58,6 +58,11 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
   vofi_real hp,surfer,s0[4],sc,tc,hc,t1,t2,dxl,dxr,hsum,ratio;
   vofi_real *pts1,*pte1,*pts2,*pte2,*psa,*psb,*pth1,*pth2,*pha,*phb;
     
+  // Add variables for centroid calculation
+  vofi_real weighted_centroid[3] = {0.0, 0.0, 0.0};
+  vofi_real tri_centroid[3], tri_area;
+  vofi_real total_area = 0.0;
+
   surfer = hp = 0.;
   nsec = 0;
   km = k - 1;
@@ -113,7 +118,43 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xb[0] = t2; xb[1] = *pts2; xb[2] = *pth2;      
       pts1++; pth1++;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+
+      // Calculate triangle area
+      tri_area = vofi_triarea(xa, xb, xc);
+      surfer += tri_area; 
+
+      // Calculate and add weighted triangle centroid contribution
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
@@ -144,19 +185,163 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xa[0] = t1; xa[1] = *psa;  xa[2] = *pha;
       xb[0] = tc; xb[1] = sc;    xb[2] = hc;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc);
+      
+      // Add after each triangle area calculation:
+      tri_area = vofi_triarea(xa,xb,xc);
+      surfer += tri_area;
+
+      // Add centroid calculation for this triangle
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xc[0] = t2; xc[1] = *psb;  xc[2] = *phb;
-      surfer += vofi_triarea(xa,xb,xc); 
+      
+      // Add after each triangle area calculation:
+      tri_area = vofi_triarea(xa,xb,xc);
+      surfer += tri_area;
+
+      // Add centroid calculation for this triangle
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+      
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xa[0] = t2; xa[1] = *pts2; xa[2] = *pth2;
-      surfer += vofi_triarea(xa,xb,xc); 
+      
+      // Add after each triangle area calculation:
+      tri_area = vofi_triarea(xa,xb,xc);
+      surfer += tri_area;
+
+      // Add centroid calculation for this triangle
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xc[0] = t1; xc[1] = *pts1;  xc[2] =*pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+      
+      // Add after each triangle area calculation:
+      tri_area = vofi_triarea(xa,xb,xc);
+      surfer += tri_area;
+
+      // Add centroid calculation for this triangle
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
@@ -167,10 +352,50 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xb[0] = t2; xb[1] = *pts2; xb[2] = *pth2;
       pts1++; pth1++;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+      tri_area = vofi_triarea(xa, xb, xc);
+      surfer += tri_area; 
+
+      // After calculating tri_area for each triangle:
+      if (if_centroid != NULL && tri_area > 0.0) {
+        // Convert triangle vertices to global coordinates
+        vofi_real v1[3], v2[3], v3[3];
+        
+        // First vertex
+        v1[0] = x0[0] + xa[0]*tdir[0] + xa[1]*sdir[0] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[0];
+        v1[1] = x0[1] + xa[0]*tdir[1] + xa[1]*sdir[1] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[1];
+        v1[2] = x0[2] + xa[0]*tdir[2] + xa[1]*sdir[2] + (f_sign < 0 ? (hp-xa[2]) : xa[2])*pdir[2];
+        
+        // Second vertex
+        v2[0] = x0[0] + xb[0]*tdir[0] + xb[1]*sdir[0] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[0];
+        v2[1] = x0[1] + xb[0]*tdir[1] + xb[1]*sdir[1] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[1];
+        v2[2] = x0[2] + xb[0]*tdir[2] + xb[1]*sdir[2] + (f_sign < 0 ? (hp-xb[2]) : xb[2])*pdir[2];
+        
+        // Third vertex
+        v3[0] = x0[0] + xc[0]*tdir[0] + xc[1]*sdir[0] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[0];
+        v3[1] = x0[1] + xc[0]*tdir[1] + xc[1]*sdir[1] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[1];
+        v3[2] = x0[2] + xc[0]*tdir[2] + xc[1]*sdir[2] + (f_sign < 0 ? (hp-xc[2]) : xc[2])*pdir[2];
+        
+        // Calculate triangle centroid (average of vertices)
+        tri_centroid[0] = (v1[0] + v2[0] + v3[0]) / 3.0;
+        tri_centroid[1] = (v1[1] + v2[1] + v3[1]) / 3.0;
+        tri_centroid[2] = (v1[2] + v2[2] + v3[2]) / 3.0;
+        
+        // Add weighted contribution to interface centroid
+        weighted_centroid[0] += tri_centroid[0] * tri_area;
+        weighted_centroid[1] += tri_centroid[1] * tri_area;
+        weighted_centroid[2] += tri_centroid[2] * tri_area;
+        total_area += tri_area;
+      }
+            
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
+  }
+  // Normalize the centroid by total area
+  if (if_centroid != NULL && total_area > 0.0) {
+    if_centroid[0] = weighted_centroid[0] / total_area;
+    if_centroid[1] = weighted_centroid[1] / total_area;
+    if_centroid[2] = weighted_centroid[2] / total_area;
   }
 
   return surfer;

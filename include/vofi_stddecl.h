@@ -178,9 +178,10 @@ void vofi_check_tertiary_side(integrand,vofi_void_cptr,vofi_creal [],
                               vofi_creal);
 
 /* function to compute the arclength of the interface in a cell (2D) */
+// Find the line declaring vofi_interface_length and update it to include the new parameter
 double vofi_interface_length(integrand,vofi_void_cptr,vofi_creal [],
                              vofi_creal [],vofi_creal [],vofi_creal [],
-                             len_data [],vofi_cint);
+                             len_data *,vofi_cint,vofi_real []);
 
 /* functions to compute the interface intersections with a cell side */
 /* or the external limits of a cap-like intersections                */
@@ -267,10 +268,11 @@ void tecplot_triangle(vofi_creal [],vofi_creal [],vofi_creal [],
 /* functions to triangulate the interface by adding end points along     */
 /* the secondary direction on integration planes, and all points on edge */
 /* planes, and to compute the triangles area */
-double vofi_interface_surface(integrand,vofi_void_cptr,vofi_creal [],
-                              vofi_creal [],vofi_creal [],vofi_creal [],
-                              vofi_creal [],vofi_creal [],len_data [],
-                              len_data [],vofi_cint,vofi_cint,vofi_cint);
+double vofi_interface_surface(integrand, vofi_void_cptr, vofi_creal [],
+                              vofi_creal [], vofi_creal [], vofi_creal [],
+                              vofi_creal [], vofi_creal [], len_data [],
+                              len_data [], vofi_cint, vofi_cint, vofi_cint,
+                              vofi_real []);
 void vofi_end_points(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                      vofi_creal [],vofi_creal [],len_data []);
 void vofi_edge_points(integrand,vofi_void_cptr,vofi_creal [],

@@ -208,6 +208,11 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
   vofi_creal *ptw_ext,*ptx_ext;
   len_data xhpn[2],xhpo[2];
   min_data xfs;
+
+  // Add for interface centroid calculation
+  vofi_real if_centroid_local[3] = {0.0, 0.0, 0.0};
+  vofi_real if_centroid_total[3] = {0.0, 0.0, 0.0};
+  vofi_real total_if_area = 0.0;
   
   volume = surfer = hp = hs = ht = xp = xs = xt = 0.;
   for (i=0;i<NDIM;i++) { 
@@ -281,8 +286,27 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
             vofi_end_points(impl_func,par,x1,h0,pdir,sdir,xhpo);
           }
           else if (k > 1 && k < nexpt) {
-            surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,
-                                             sdir,tdir,xhpn,xhpo,k,nexpt,nvis[1]);
+            // Reset local centroid for this segment
+            if (nex[2] > 0) {
+              if_centroid_local[0] = if_centroid_local[1] = if_centroid_local[2] = 0.0;
+              
+              // Call with centroid parameter
+              vofi_real segment_area = vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,
+                                                  sdir,tdir,xhpn,xhpo,k,nexpt,nvis[1],
+                                                  if_centroid_local);
+              surfer += segment_area;
+              
+              // Add weighted contribution to total centroid
+              if_centroid_total[0] += if_centroid_local[0] * segment_area;
+              if_centroid_total[1] += if_centroid_local[1] * segment_area;
+              if_centroid_total[2] += if_centroid_local[2] * segment_area;
+              total_if_area += segment_area;
+            } else {
+              // Original call without centroid
+              surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,
+                                              sdir,tdir,xhpn,xhpo,k,nexpt,nvis[1],
+                                              NULL);
+            }
             xhpo[0] = xhpn[0]; xhpo[1] = xhpn[1];
           }
           else {
@@ -295,8 +319,27 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
             vofi_edge_points(impl_func,par,x1,h0,base_int,pdir,sdir,xhpn,
                              nptin,nintmp,nsect,ndire);
             vofi_end_points(impl_func,par,x1,h0,pdir,sdir,xhpn);
-            surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,  
-                                     sdir,tdir,xhpn,xhpo,k+1,nexpt,nvis[1]);
+            // Reset local centroid for this segment
+            if (nex[2] > 0) {
+              if_centroid_local[0] = if_centroid_local[1] = if_centroid_local[2] = 0.0;
+              
+              // Call with centroid parameter
+              vofi_real segment_area = vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,  
+                                            sdir,tdir,xhpn,xhpo,k+1,nexpt,nvis[1],
+                                            if_centroid_local);
+              surfer += segment_area;
+              
+              // Add weighted contribution to total centroid
+              if_centroid_total[0] += if_centroid_local[0] * segment_area;
+              if_centroid_total[1] += if_centroid_local[1] * segment_area;
+              if_centroid_total[2] += if_centroid_local[2] * segment_area;
+              total_if_area += segment_area;
+            } else {
+              // Original call without centroid
+              surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,  
+                                      sdir,tdir,xhpn,xhpo,k+1,nexpt,nvis[1],
+                                      NULL);
+            }
           }
         }
         quadv += (*ptw_ext)*area;
@@ -319,6 +362,13 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
   centroid[1] = xs;
   centroid[2] = xt;
   centroid[3] = surfer;
+
+  // Add interface centroid normalization and storage
+  if (nex[2] > 0 && total_if_area > 0.0) {
+    centroid[4] = if_centroid_total[0] / total_if_area;
+    centroid[5] = if_centroid_total[1] / total_if_area;
+    centroid[6] = if_centroid_total[2] / total_if_area;
+  }
   
   return volume;
 }
