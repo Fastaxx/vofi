@@ -56,7 +56,6 @@
 #define Sq(a) ((a)*(a))
 #define Sq2(a) (a[0]*a[0] + a[1]*a[1])
 #define Sq3(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2])
-#define Sq4(a) (a[0]*a[0] + a[1]*a[1] + a[2]*a[2] + a[3]*a[3])  // 4D implementation
 #define Sqd3(a,b) ((a[0]-b[0])*(a[0]-b[0])+(a[1]-b[1])*(a[1]-b[1])+(a[2]-b[2])*(a[2]-b[2]))
 #define SHFT4(a,b,c,d)  (a)=(b); (b)=(c); (c)=(d)
 #define CPSF(s,t,f,g) (s)=(t); (f)=(g)
@@ -70,7 +69,7 @@
 #define NEAR_EDGE_RATIO 2.0e-02
 #define MAX_ITER_ROOT 15
 #define MAX_ITER_MINI 50  
-#define NDIM   4  // 4D implementation
+#define NDIM   3
 #define NVER   4
 #define NSE    2
 #define NSEG  10
@@ -135,18 +134,6 @@ typedef struct {
   vofi_real ht0[NGLM+2];
   vofi_real htp[NGLM+2];
 } len_data; 
-
-/* min4d_data structure:
-   Extended version of min_data with documentation for 4D context
-   Additional field isc4: specific to 4D intersection structure */
-typedef struct {
-  vofi_real xval[NDIM]; 
-  vofi_real fval; 
-  vofi_real sval; 
-  vofi_int isc[NDIM];
-  vofi_int isc4;   /* 4D-specific intersection info */ 
-  vofi_int ipt;
-} min4d_data;
 
 /*------------ function prototypes ------------*/
 
@@ -293,23 +280,5 @@ void vofi_edge_points(integrand,vofi_void_cptr,vofi_creal [],
                       vofi_cint ,vofi_int [],vofi_int []);
 vofi_real vofi_triarea(vofi_creal [],vofi_creal [],vofi_creal []);
 
-/* functions for 4D hypercube cell type detection and coordinate ordering */
-vofi_int vofi_cell_type_4D(integrand, vofi_void_cptr, vofi_creal [], vofi_creal []);
-
-vofi_int vofi_check_boundary_hypercube(integrand, vofi_void_cptr, vofi_creal [],
-                                     vofi_creal [], vofi_real [][NSE][NSE][NSE],
-                                     min4d_data [], vofi_int [][NSE][NSE][NSE]);
-
-/* 4D extension function declarations */
-dir_data vofi_check_face_consistency_3D(integrand, vofi_void_cptr, vofi_creal [],
-                                      vofi_creal [], vofi_creal [], vofi_creal [],
-                                      vofi_creal [], vofi_creal []);
-
-/* Find minimum on 3D face of 4D hypercube */
-vofi_int vofi_get_face_min_3D(integrand, vofi_void_cptr, 
-                            vofi_creal [], vofi_creal [],
-                            vofi_creal [], vofi_creal [],
-                            vofi_creal [], vofi_creal [],
-                            min_data *, dir_data);
 
 #endif
