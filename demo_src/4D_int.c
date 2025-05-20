@@ -41,8 +41,6 @@ double torus4d_func(const double x[], void *par) {
     return spine_dist - r;
 }
 
-// External declaration of just the cell type function
-extern vofi_int vofi_cell_type_4D(integrand, vofi_void_cptr, vofi_creal [], vofi_creal []);
 
 int main() {
     // Mesh parameters
@@ -115,7 +113,7 @@ int main() {
                     x0[3] = l * dx;
                     
                     // Get cell type
-                    cell_type = vofi_cell_type_4D(func, NULL, x0, h0);
+                    cell_type = vofi_get_cell_type(func, NULL, x0, h0, 4);
                     
                     // Count cells by type
                     if (cell_type == 0) empty_cells++;
@@ -189,7 +187,7 @@ int main() {
                     x0[3] = l * dx;
                     
                     // Get cell type
-                    cell_type = vofi_cell_type_4D(func, NULL, x0, h0);
+                    cell_type = vofi_get_cell_type(func, NULL, x0, h0, 4);
                     
                     // Write: i j k l cell_type
                     fprintf(outfile, "%d %d %d %d %d\n", i, j, k, l, cell_type);
