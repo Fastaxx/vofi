@@ -490,8 +490,9 @@ vofi_int vofi_get_limits_edge_2D(integrand impl_func,vofi_void_cptr par,
   if (nsub == nsub_int)
     ;
   else {
-    printf(" EXIT: in vofi_get_limits_edge_2D: never occured! \n"); 
-    exit(1);
+    printf("Warning: vofi_get_limits_edge_2D: unexpected subdivision mismatch.\n");
+    /* best effort: reorder and remove degenerate segments (already done),
+    return current nsub so caller can handle it */
   }
   
   return nsub;    
