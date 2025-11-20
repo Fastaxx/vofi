@@ -134,16 +134,9 @@ vofi_real vofi_get_segment_zero(integrand impl_func,vofi_void_cptr par,
       s0[3] = f_sign*fps;     
     }
     else {
-      printf("Warning: getzero bracket check failed (f1*f2 > 0).\n");
-      printf("f1: %17.10e f2: %17.10e -- returning fallback.\n",f1,f2);
-      /* fallback: linear interpolation between endpoints */
-      if (f2 - f1 != 0.0) {
-        ss = -f1*(s2 - s1)/(f2 - f1);
-        sz = f_sign*ss + 0.5*(1-f_sign)*s0[0];
-      } else {
-        /* if values are equal (rare), return midpoint */
-        sz = 0.5*s0[0];
-      }
+      printf(" EXIT: in getzero f1*f2 > 0! \n");
+      printf("f1: %17.10e f2: %17.10e \n",f1,f2);
+      exit(1);
     }
   }
   
