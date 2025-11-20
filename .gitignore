@@ -1,1 +1,8 @@
 /build*
+.vscode/
+
+# executables
+*.exe
+*.out
+*.app
+test_3d
