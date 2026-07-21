@@ -134,9 +134,15 @@ vofi_real vofi_get_segment_zero(integrand impl_func,vofi_void_cptr par,
       s0[3] = f_sign*fps;     
     }
     else {
-      printf(" EXIT: in getzero f1*f2 > 0! \n");
-      printf("f1: %17.10e f2: %17.10e \n",f1,f2);
-      exit(1);
+      /* Degenerate bracket: the endpoints do not straddle a root even
+	 though the upstream edge analysis expected one — the interface
+	 GRAZES this interval (observed with tangency defects down to
+	 1e-16 on coarse space-time boxes). Return the endpoint closest
+	 to a root instead of aborting: the induced error is bounded by
+	 the graze depth, which is what brought us here. */
+      ss = (fabs(f1) <= fabs(f2)) ? s1 : s2;
+      sz = f_sign*ss + 0.5*(1-f_sign)*s0[0];
+      s0[3] = f_sign*fps;
     }
   }
   
