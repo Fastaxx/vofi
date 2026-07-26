@@ -532,8 +532,14 @@ vofi_int vofi_rm_segs(vofi_real baser[],vofi_int basei[],vofi_int nsub)
   ds = baser[1]-baser[0];
   ks = basei[1]*basei[0];
   eps = eps2[ks];
-  while (i<nsub) {                           
-    if (ds < eps) {
+  while (i<nsub) {
+    /* NaN-robust: a NaN ds (a degenerate/tangent configuration upstream
+       can 0/0 a segment coordinate) satisfies NEITHER ds < eps NOR
+       ds >= eps, so the original loop advances nothing and spins
+       forever. Treat it as a degenerate segment and remove it: each
+       pass then either increments i or decrements nsub, so the loop
+       terminates. Bit-identical to ds < eps for normal numbers. */
+    if (!(ds >= eps)) {
       if (basei[i] == 1)
 	;
       else if (basei[i+1] == 1)
