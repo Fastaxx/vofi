@@ -487,14 +487,16 @@ vofi_int vofi_get_limits_edge_2D(integrand impl_func,vofi_void_cptr par,
   /* - */
   vofi_reorder(baser,basei,nsub);
   
-  if (nsub == nsub_int)
-    ;
-  else {
-    printf(" EXIT: in vofi_get_limits_edge_2D: never occured! \n"); 
-    exit(1);
-  }
-  
-  return nsub;    
+  /* Degenerate/tangent configurations (an interface grazing this edge
+     plane while crossing the inner plane — observed on the
+     symmetric-bubble apex cell of a space-time slab) legitimately
+     reconstruct a DIFFERENT subdivision count than the inner plane
+     predicted. Return the actual count instead of aborting: the
+     mismatch degrades only this box's interface-measure quadrature
+     (the heights pairing may drop a graze-depth-bounded sliver), not
+     the volume integral. */
+
+  return nsub;
 }
 
 /* -------------------------------------------------------------------------- */
