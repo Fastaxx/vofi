@@ -129,9 +129,14 @@ vofi_real vofi_get_segment_zero(integrand impl_func,vofi_void_cptr par,
       if (sr < s2) {
         s2 = sr; f2 = fr;
       }
-      ss = s1 - f1*(s2-s1)/(f2-f1);
+      /* an exactly-zero endpoint makes f2 - f1 vanish: the secant is
+         0/0 (SIGFPE); either endpoint IS the root then */
+      if (fabs(f2-f1) > 0.)
+        ss = s1 - f1*(s2-s1)/(f2-f1);
+      else
+        ss = s1;
       sz = f_sign*ss + 0.5*(1-f_sign)*s0[0];
-      s0[3] = f_sign*fps;     
+      s0[3] = f_sign*fps;
     }
     else {
       /* Degenerate bracket: the endpoints do not straddle a root even
