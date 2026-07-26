@@ -266,10 +266,21 @@ void tecplot_triangle(vofi_creal [],vofi_creal [],vofi_creal [],
 /* functions to triangulate the interface by adding end points along     */
 /* the secondary direction on integration planes, and all points on edge */
 /* planes, and to compute the triangles area */
+/* public entry points (see vofi.h): vofi_get_cc is the historical one,   */
+/* vofi_get_cc_gam adds the interface centroid                            */
+double vofi_get_cc(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
+                   double [],vofi_cint [],vofi_cint [],vofi_cint [],vofi_cint);
+double vofi_get_cc_gam(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
+                       double [],double [],vofi_cint [],vofi_cint [],
+                       vofi_cint [],vofi_cint);
+
+/* the last argument accumulates the area-weighted interface centroid in  */
+/* the (pdir,sdir,tdir) frame; pass NULL not to compute it               */
 double vofi_interface_surface(integrand,vofi_void_cptr,vofi_creal [],
                               vofi_creal [],vofi_creal [],vofi_creal [],
                               vofi_creal [],vofi_creal [],len_data [],
-                              len_data [],vofi_cint,vofi_cint,vofi_cint);
+                              len_data [],vofi_cint,vofi_cint,vofi_cint,
+                              double []);
 void vofi_end_points(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                      vofi_creal [],vofi_creal [],len_data []);
 void vofi_edge_points(integrand,vofi_void_cptr,vofi_creal [],

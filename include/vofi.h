@@ -49,6 +49,14 @@ vofi_real vofi_get_cc(integrand,vofi_void_cptr,vofi_creal [],
                       vofi_creal [],vofi_real [],vofi_cint [],
                       vofi_cint [],vofi_cint [],vofi_cint);
 
+/* as vofi_get_cc, with the INTERFACE CENTROID returned in the extra array
+   (3 reals; 3D only, and only when nex[1] > 0 -- the cell centre
+   otherwise). It is the centroid of the same triangulated surface whose
+   area vofi_get_cc already returns in xex[3]. */
+vofi_real vofi_get_cc_gam(integrand,vofi_void_cptr,vofi_creal [],
+                          vofi_creal [],vofi_real [],vofi_real [],
+                          vofi_cint [],vofi_cint [],vofi_cint [],vofi_cint);
+
  vofi_int vofi_get_cell_type(integrand,vofi_void_cptr,vofi_creal [],
 			     vofi_creal [],vofi_cint);
 

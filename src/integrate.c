@@ -205,11 +205,14 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
   vofi_real x1[NDIM],cent_2D[NDIM],base_int[NSEG],xmidt[NGLM+2];
   vofi_real volume,vol,hp,hs,ht,xp,xs,xt,hm;
   vofi_real dt,mdpt,xit,area,quadv,quadp,quads,quadt,surfer;
+  vofi_real scent[NDIM],*psc;
   vofi_creal *ptw_ext,*ptx_ext;
   len_data xhpn[2],xhpo[2];
   min_data xfs;
   
   volume = surfer = hp = hs = ht = xp = xs = xt = 0.;
+  scent[0] = scent[1] = scent[2] = 0.;
+  psc = (nex[1] > 0) ? scent : NULL;   /* no centroid work if unrequested */
   for (i=0;i<NDIM;i++) { 
     hp += pdir[i]*h0[i];
     hs += sdir[i]*h0[i];
@@ -282,7 +285,7 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
           }
           else if (k > 1 && k < nexpt) {
             surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,
-                                             sdir,tdir,xhpn,xhpo,k,nexpt,nvis[1]);
+                                             sdir,tdir,xhpn,xhpo,k,nexpt,nvis[1],psc);
             xhpo[0] = xhpn[0]; xhpo[1] = xhpn[1];
           }
           else {
@@ -296,7 +299,7 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
                              nptin,nintmp,nsect,ndire);
             vofi_end_points(impl_func,par,x1,h0,pdir,sdir,xhpn);
             surfer += vofi_interface_surface(impl_func,par,x0,h0,xmidt,pdir,  
-                                     sdir,tdir,xhpn,xhpo,k+1,nexpt,nvis[1]);
+                                     sdir,tdir,xhpn,xhpo,k+1,nexpt,nvis[1],psc);
           }
         }
         quadv += (*ptw_ext)*area;
@@ -319,6 +322,9 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
   centroid[1] = xs;
   centroid[2] = xt;
   centroid[3] = surfer;
+  centroid[4] = scent[0];               /* area-weighted interface */
+  centroid[5] = scent[1];               /* centroid, local frame   */
+  centroid[6] = scent[2];
   
   return volume;
 }

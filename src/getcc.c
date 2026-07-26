@@ -42,14 +42,31 @@
  * OUTPUT: area/volume fraction cc,  centroid coordinates and interface       *
  *         length/area xex                                                    *
  * -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- *
+ * vofi_get_cc: the historical entry point, unchanged.                        *
+ * vofi_get_cc_gam: the same, plus the INTERFACE CENTROID in xgam (3 reals,   *
+ * ndim0 == 3 only). The interface area vofi already returns is a sum of      *
+ * triangle areas, so the centroid handed back here is the centroid of that   *
+ * same triangulated surface -- the identical quadrature, not a separate      *
+ * approximation. Where the cell carries no interface, xgam is the cell       *
+ * centre. Pass xgam = NULL (or nex[1] == 0) to skip the extra work.          *
+ * -------------------------------------------------------------------------- */
 vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
                       vofi_creal h0[],vofi_real xex[],vofi_cint nex[],
-                      vofi_cint npt[],vofi_cint nvis[],vofi_cint ndim0) 
+                      vofi_cint npt[],vofi_cint nvis[],vofi_cint ndim0)
+{
+  return vofi_get_cc_gam(impl_func,par,xin,h0,xex,NULL,nex,npt,nvis,ndim0);
+}
+
+vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
+                      vofi_creal xin[],vofi_creal h0[],vofi_real xex[],
+                      vofi_real xgam[],vofi_cint nex[],
+                      vofi_cint npt[],vofi_cint nvis[],vofi_cint ndim0)
 {
   vofi_int  i,icc,nsub;
   vofi_int nsect[NSEG],ndire[NSEG];
   vofi_real f03D[NSE][NSE][NSE],f02D[NSE][NSE],base[NSEG];
-  vofi_real centroid[NDIM+1],x0[NDIM],area,volume,cc;
+  vofi_real centroid[NDIM+1+NDIM],x0[NDIM],area,volume,cc;
   vofi_real pdir[NDIM]={0.,0.,0.},sdir[NDIM]={0.,0.,0.},tdir[NDIM]={0.,0.,0.};
   min_data  xfsp[5]={{{0.,0.,0.},0.,0.,{0,0,0},0},{{0.,0.,0.},0.,0.,{0,0,0},0},
                      {{0.,0.,0.},0.,0.,{0,0,0},0},{{0.,0.,0.},0.,0.,{0,0,0},0},
@@ -57,6 +74,12 @@ vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
   len_data xhp[2];
   
   xhp[0].np0 = xhp[1].np0 = 0;
+  if (xgam != NULL) {              /* the cell centre, unless an interface */
+    for (i=0;i<NDIM;i++)           /* is found and asked for below         */
+      xgam[i] = 0.;
+    for (i=0;i<ndim0;i++)
+      xgam[i] = xin[i] + 0.5*h0[i];
+  }
   for (i=0;i<=NDIM;i++)
     xex[i] = 0.0;
   if (ndim0 == 2) {                                               /* - */
@@ -113,8 +136,14 @@ vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
         xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i] + 
                  centroid[2]*tdir[i];
     }
-    if (nex[1] > 0)
+    if (nex[1] > 0) {
       xex[3] = centroid[3];
+      if (xgam != NULL && centroid[3] > 0.)
+        for (i=0;i<NDIM;i++)
+          xgam[i] = x0[i] + (centroid[4]/centroid[3])*pdir[i] +
+                            (centroid[5]/centroid[3])*sdir[i] +
+                            (centroid[6]/centroid[3])*tdir[i];
+    }
   }
   else {                                                          /* - */
     printf(" EXIT: wrong value of variable ndim0! \n");

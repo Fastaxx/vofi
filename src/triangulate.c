@@ -46,11 +46,42 @@
  * vofi_real vofi_interface_surface: compute triangles from height points     *
  * vofi_real vofi_triarea: calculate triangle area                            *
  * -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- *
+ * DESCRIPTION:                                                               *
+ * area of one interface triangle, accumulating its AREA-WEIGHTED CENTROID    *
+ * in scent (skipped when scent is NULL). The interface area returned by      *
+ * vofi_get_cc IS this triangle sum, so the centroid accumulated here is the  *
+ * centroid of the very same polyhedral surface -- consistent by             *
+ * construction, and to the same order.                                       *
+ * scent is in the (pdir,sdir,tdir) frame, the order the volume centroid      *
+ * uses; the height component carries the same f_sign flip as the physical    *
+ * mapping in tecplot_triangle(). That flip is an isometry, so the AREA is    *
+ * unaffected by it -- the centroid is not.                                   *
+ * -------------------------------------------------------------------------- */
+static vofi_real vofi_triadd(vofi_real scent[],vofi_creal xa[],vofi_creal xb[],
+                             vofi_creal xc[],vofi_creal hp,vofi_cint f_sign)
+{
+  vofi_real area,ha,hb,hc;
+
+  area = vofi_triarea(xa,xb,xc);
+  if (scent != NULL && area > 0.) {
+    ha = xa[2]; hb = xb[2]; hc = xc[2];
+    if (f_sign < 0) {
+      ha = hp - ha; hb = hp - hb; hc = hp - hc;
+    }
+    scent[0] += area*(ha + hb + hc)/3.;
+    scent[1] += area*(xa[1] + xb[1] + xc[1])/3.;
+    scent[2] += area*(xa[0] + xb[0] + xc[0])/3.;
+  }
+
+  return area;
+}
+
 vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_creal xt[],
                          vofi_creal pdir[],vofi_creal sdir[],vofi_creal tdir[],
                          len_data xhpn[],len_data xhpo[],vofi_cint k,
-                         vofi_cint nexpt,vofi_cint ipf)
+                         vofi_cint nexpt,vofi_cint ipf,vofi_real scent[])
 {
   vofi_int i,j,nsec,npn,npo,f_sign,it0,km;
   vofi_int djl,djc,djr,npa,nmin,nmax;
@@ -113,7 +144,7 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xb[0] = t2; xb[1] = *pts2; xb[2] = *pth2;      
       pts1++; pth1++;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign); 
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
@@ -144,19 +175,19 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xa[0] = t1; xa[1] = *psa;  xa[2] = *pha;
       xb[0] = tc; xb[1] = sc;    xb[2] = hc;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc);
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign);
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xc[0] = t2; xc[1] = *psb;  xc[2] = *phb;
-      surfer += vofi_triarea(xa,xb,xc); 
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign); 
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xa[0] = t2; xa[1] = *pts2; xa[2] = *pth2;
-      surfer += vofi_triarea(xa,xb,xc); 
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign); 
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
       xc[0] = t1; xc[1] = *pts1;  xc[2] =*pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign); 
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
@@ -167,7 +198,7 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
       xb[0] = t2; xb[1] = *pts2; xb[2] = *pth2;
       pts1++; pth1++;
       xc[0] = t1; xc[1] = *pts1; xc[2] = *pth1;
-      surfer += vofi_triarea(xa,xb,xc); 
+      surfer += vofi_triadd(scent,xa,xb,xc,hp,f_sign); 
       if (ipf)
         tecplot_triangle(x0,pdir,sdir,tdir,xa,xb,xc,hp,f_sign);
     }
