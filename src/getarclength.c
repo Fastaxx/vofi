@@ -39,15 +39,48 @@
  *         printing flag ipf                                                  *
  * OUTPUT: length of the interface line arc                                   *
  * FUNCTIONS:                                                                 *
- * vofi_real vofi_interface_length                                            *
+ * vofi_real vofi_segadd, vofi_real vofi_interface_length                     *
  * -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- *
+ * DESCRIPTION:                                                               *
+ * length of one interface chord, accumulating its LENGTH-WEIGHTED MIDPOINT   *
+ * in scent (skipped when scent is NULL). The 2D analogue of vofi_triadd():   *
+ * the arclength returned by vofi_get_cc IS this chord sum, so the centroid   *
+ * accumulated here is the centroid of the very same polyline -- consistent   *
+ * by construction, and to the same order.                                    *
+ * scent is in the (pdir,sdir) frame, the order the area centroid uses; the   *
+ * height component carries the same f_sign flip as the physical mapping in   *
+ * tecplot_arcline(). That flip is an isometry, so the LENGTH is unaffected   *
+ * by it -- the centroid is not.                                              *
+ * -------------------------------------------------------------------------- */
+static vofi_real vofi_segadd(vofi_real scent[],vofi_creal xa,vofi_creal ha,
+                             vofi_creal xb,vofi_creal hb,vofi_creal hp,
+                             vofi_cint f_sign)
+{
+  vofi_real seg,h1,h2;
+
+  seg = sqrt((xa-xb)*(xa-xb) + (ha-hb)*(ha-hb));
+  if (scent != NULL && seg > 0.) {
+    h1 = ha; h2 = hb;
+    if (f_sign < 0) {
+      h1 = hp - h1; h2 = hp - h2;
+    }
+    scent[0] += seg*0.5*(h1 + h2);
+    scent[1] += seg*0.5*(xa + xb);
+  }
+
+  return seg;
+}
+
 vofi_real vofi_interface_length(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_creal pdir[],
-                         vofi_creal sdir[],len_data xhhp[],vofi_cint ipf)
+                         vofi_creal sdir[],len_data xhhp[],vofi_real scent[],
+                         vofi_cint ipf)
 {
   FILE *fp;
   vofi_int i,j,k,npt,f_sign,it0,nseg,j0,j1,j2,j3;
-  vofi_real hp,a1,a2,b1,b2,ratio,xm,hm,hpm,arc,d1,d2,hsum;
+  vofi_real hp,a1,a2,b1,b2,ratio,xm,hm,hpm,arc,hsum;
   vofi_real dx1,dx2,dx12,dc1,dc2,x0b,h0b,hpb,xc,hc,xl,hl,xr,hr;
   vofi_real x20[NDIM],x21[NDIM],s0[4];
 
@@ -143,9 +176,8 @@ vofi_real vofi_interface_length(integrand impl_func,vofi_void_cptr par,
       xc = xm;
       hsum = hl + hr;
       hc = 0.5*hsum + sqrt(3.)/3.*(2.*hm - hsum);
-      d1 = (xl-xc)*(xl-xc) + (hl-hc)*(hl-hc);
-      d2 = (xr-xc)*(xr-xc) + (hr-hc)*(hr-hc);
-      arc += sqrt(d1) + sqrt(d2);
+      arc += vofi_segadd(scent,xl,hl,xc,hc,hp,f_sign);
+      arc += vofi_segadd(scent,xc,hc,xr,hr,hp,f_sign);
       if (ipf == 1) {
         tecplot_arcline(x0,pdir,sdir,xc,hc,hp,f_sign,fp);   
         tecplot_arcline(x0,pdir,sdir,xr,hr,hp,f_sign,fp);

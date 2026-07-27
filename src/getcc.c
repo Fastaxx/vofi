@@ -45,11 +45,12 @@
 /* -------------------------------------------------------------------------- *
  * vofi_get_cc: the historical entry point, unchanged.                        *
  * vofi_get_cc_gam: the same, plus the INTERFACE CENTROID in xgam (3 reals,   *
- * ndim0 == 3 only). The interface area vofi already returns is a sum of      *
- * triangle areas, so the centroid handed back here is the centroid of that   *
- * same triangulated surface -- the identical quadrature, not a separate      *
- * approximation. Where the cell carries no interface, xgam is the cell       *
- * centre. Pass xgam = NULL (or nex[1] == 0) to skip the extra work.          *
+ * both ndim0 == 2 and ndim0 == 3). The interface length/area vofi already    *
+ * returns is a sum of chords (2D) or of triangles (3D), so the centroid      *
+ * handed back here is the centroid of that same polyline/polyhedral surface  *
+ * -- the identical quadrature, not a separate approximation. Where the cell  *
+ * carries no interface, xgam is the cell centre. Pass xgam = NULL (or        *
+ * nex[1] == 0) to skip the extra work.                                       *
  * -------------------------------------------------------------------------- */
 vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
                       vofi_creal h0[],vofi_real xex[],vofi_cint nex[],
@@ -107,8 +108,16 @@ vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
       for (i=0;i<NSE;i++)
         xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i];
     }
-    if (nex[1] > 0) {      
-      xex[3] = vofi_interface_length(impl_func,par,x0,h0,pdir,sdir,xhp,nvis[1]);
+    if (nex[1] > 0) {
+      vofi_real scent[NDIM],*psc;
+      scent[0] = scent[1] = scent[2] = 0.;
+      psc = (xgam != NULL) ? scent : NULL;
+      xex[3] = vofi_interface_length(impl_func,par,x0,h0,pdir,sdir,xhp,psc,
+                                     nvis[1]);
+      if (psc != NULL && xex[3] > 0.)
+        for (i=0;i<NSE;i++)
+          xgam[i] = x0[i] + (scent[0]/xex[3])*pdir[i] +
+                            (scent[1]/xex[3])*sdir[i];
     }
   }
   else if (ndim0 == 3) {                                          /* - */

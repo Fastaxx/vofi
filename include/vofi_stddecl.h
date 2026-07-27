@@ -176,10 +176,12 @@ void vofi_check_tertiary_side(integrand,vofi_void_cptr,vofi_creal [],
                               vofi_creal [],vofi_real [][NSE][NSE],min_data[],
                               vofi_creal);
 
-/* function to compute the arclength of the interface in a cell (2D) */
+/* function to compute the arclength of the interface in a cell (2D),  */
+/* and, if scent != NULL, the length-weighted first moment of the same */
+/* polyline in the local (pdir,sdir) frame                             */
 double vofi_interface_length(integrand,vofi_void_cptr,vofi_creal [],
                              vofi_creal [],vofi_creal [],vofi_creal [],
-                             len_data [],vofi_cint);
+                             len_data [],vofi_real [],vofi_cint);
 
 /* functions to compute the interface intersections with a cell side */
 /* or the external limits of a cap-like intersections                */
