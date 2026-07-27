@@ -39,18 +39,26 @@
  *         par, coordinates of minimum vertex xin, cell edges h0, integer     *
  *         flags to compute centroid and interface length/area nex, user's    *
  *         number of points npt, printing flags nvis, space dimensions ndim0  *
- * OUTPUT: area/volume fraction cc,  centroid coordinates and interface       *
- *         length/area xex                                                    *
+ *         (1, 2 or 3)                                                        *
+ * OUTPUT: length/area/volume fraction cc, centroid coordinates and           *
+ *         interface count/length/area xex                                    *
  * -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- *
  * vofi_get_cc: the historical entry point, unchanged.                        *
  * vofi_get_cc_gam: the same, plus the INTERFACE CENTROID in xgam (3 reals,   *
- * both ndim0 == 2 and ndim0 == 3). The interface length/area vofi already    *
- * returns is a sum of chords (2D) or of triangles (3D), so the centroid      *
- * handed back here is the centroid of that same polyline/polyhedral surface  *
- * -- the identical quadrature, not a separate approximation. Where the cell  *
- * carries no interface, xgam is the cell centre. Pass xgam = NULL (or        *
- * nex[1] == 0) to skip the extra work.                                       *
+ * ndim0 == 1, 2 and 3). The interface measure vofi already returns is a      *
+ * count of points (1D), a sum of chords (2D) or of triangles (3D), so the    *
+ * centroid handed back here is the centroid of that same point set /         *
+ * polyline / polyhedral surface -- the identical quadrature, not a separate  *
+ * approximation. Where the cell carries no interface, xgam is the cell       *
+ * centre. Pass xgam = NULL (or nex[1] == 0) to skip the extra work.          *
+ *                                                                           *
+ * ndim0 == 1 is the degenerate case and is worth stating plainly: on a       *
+ * segment the wet region is an interval, so cc is the root position, the     *
+ * centroid xex[0] is the interval midpoint, and the interface is a single    *
+ * POINT -- measure xex[3] = 1 (a count, dimensionless, NOT a length) with    *
+ * xgam[0] the point itself. Nothing is integrated; the whole content is the  *
+ * root, which is why it is solved exactly rather than by a secant.           *
  * -------------------------------------------------------------------------- */
 vofi_real vofi_get_cc(integrand impl_func,vofi_void_cptr par,vofi_creal xin[],
                       vofi_creal h0[],vofi_real xex[],vofi_cint nex[],
@@ -152,6 +160,57 @@ vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
           xgam[i] = x0[i] + (centroid[4]/centroid[3])*pdir[i] +
                             (centroid[5]/centroid[3])*sdir[i] +
                             (centroid[6]/centroid[3])*tdir[i];
+    }
+  }
+  else if (ndim0 == 1) {                                          /* - */
+    vofi_real dir[NDIM]={1.,0.,0.},xs[NDIM]={0.,0.,0.},s0[4];
+    vofi_real f0,f1,hh,sz;
+    vofi_int fsign;
+
+    x0[0] = xin[0]; x0[1] = 0.; x0[2] = 0.;
+    hh = h0[0];
+    xs[0] = x0[0];      f0 = impl_func(xs,par);
+    xs[0] = x0[0] + hh; f1 = impl_func(xs,par);
+
+    /* Full and empty are decided by the endpoint SIGNS alone, which also
+       disposes of every exactly-zero endpoint: (0,+) and (+,0) are empty,
+       (0,-) and (-,0) are full. A pair of roots interior to the segment
+       is therefore reported full or empty -- a sub-grid feature this
+       returns no information about, the same convention as
+       CartesianGeometry.jl's 1D kernel. */
+    if (f0 <= 0. && f1 <= 0.) {
+      if (nex[0] > 0)
+        xex[0] = x0[0] + 0.5*hh;
+      return 1.;
+    }
+    if (f0 >= 0. && f1 >= 0.) {
+      if (nex[0] > 0)
+        xex[0] = x0[0] + 0.5*hh;
+      return 0.;
+    }
+
+    /* One strict sign change: the root, and hence the wet length, is
+       resolved by the SAME safeguarded solver the 2D/3D height functions
+       use -- not by the secant. In 1D the wet volume is the root
+       position, so a linearly-interpolated crossing is a first-order
+       error in V itself; in 2D/3D it only perturbs an aperture. */
+    fsign = (f0 < 0.) ? 1 : -1;
+    s0[0] = hh;
+    s0[1] = hh*f0/(f0 - f1);            /* secant crossing: the seed */
+    xs[0] = x0[0] + s0[1];
+    s0[2] = impl_func(xs,par);
+    s0[3] = (f1 - f0)/hh;               /* slope estimate for Newton */
+    sz = vofi_get_segment_zero(impl_func,par,x0,dir,s0,fsign);
+
+    cc = sz/hh;                         /* sz IS the wet length */
+    if (nex[0] > 0)
+      xex[0] = (fsign > 0) ? x0[0] + 0.5*sz : x0[0] + hh - 0.5*sz;
+    if (nex[1] > 0) {
+      /* the interface is a POINT: its measure is the count 1, and its
+         centroid is the point itself */
+      xex[3] = 1.;
+      if (xgam != NULL)
+        xgam[0] = (fsign > 0) ? x0[0] + sz : x0[0] + hh - sz;
     }
   }
   else {                                                          /* - */
