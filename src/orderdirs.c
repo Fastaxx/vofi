@@ -50,9 +50,9 @@ vofi_int vofi_order_dirs_2D(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_real pdir[],
                          vofi_real sdir[],vofi_real f0[][NSE],min_data *xfs_pt)
 {
-  vofi_int n0[NSE][NSE],nc[NDIM][NDIM];
-  vofi_int i,j,np0,nm0,icc,check_dir,nmax0,jp,js,npt,iwgt,nix,niy;
-  vofi_real fc[NDIM][NDIM],x1[NDIM],hh[NDIM],fgrad[NSE];
+  vofi_int n0[NSE][NSE],nc[NSTC][NSTC];
+  vofi_int i,j,np0,nm0,nneg,icc,check_dir,nmax0,jp,js,npt,iwgt,nix,niy;
+  vofi_real fc[NSTC][NSTC],x1[NDIM],hh[NDIM],fgrad[NSE];
   vofi_real f0mod,fgradmod,fgradsq;
   vofi_real tmp,hm,fth,have,Kappa;
   vofi_real fx,fy,fxx,fyy,fxy;
@@ -68,7 +68,8 @@ vofi_int vofi_order_dirs_2D(integrand impl_func,vofi_void_cptr par,
     hh[i] = 0.5*h0[i];
 
   /* - */
-  x1[2] = x0[2];
+  for (i=0;i<NDIM;i++)
+    x1[i] = x0[i];
   for (i=0;i<NSE;i++)
     for (j=0;j<NSE;j++) {
       x1[0] = x0[0] + i*h0[0];
@@ -92,6 +93,7 @@ vofi_int vofi_order_dirs_2D(integrand impl_func,vofi_void_cptr par,
     
     /* - */
     /* - */
+    nneg = nm0;
     np0 = nm0 = 0;
     for (i=0;i<NSE;i++)
       for (j=0;j<NSE;j++) {
@@ -121,13 +123,15 @@ vofi_int vofi_order_dirs_2D(integrand impl_func,vofi_void_cptr par,
     check_dir = vofi_check_boundary_line(impl_func,par,x0,h0,f0,xfs_pt,n0);
     
     /* - */
+      /* nm0 and np0 were overwritten by the recount above: if NO vertex is
+         confident they are both zero, and the old test picked empty
+         whatever the sign really was -- which reported a cell lying
+         entirely inside the reference phase as empty whenever fth
+         exceeded |f| at every vertex (reachable on strongly anisotropic
+         cells). Decide on the RAW sign instead; this branch is only
+         entered when there is no sign change, so it is unambiguous. */
     if (check_dir < 0) {
-      if (nm0 > 0) {
-        icc = 1;
-      }
-      else {
-        icc = 0;
-      }
+      icc = (nneg > 0) ? 1 : 0;
       return icc;
     }
   }
@@ -154,8 +158,8 @@ vofi_int vofi_order_dirs_2D(integrand impl_func,vofi_void_cptr par,
   }
 
   /* - */
-  for (i=0;i<NDIM;i++)
-    for (j=0;j<NDIM;j++) {
+  for (i=0;i<NSTC;i++)
+    for (j=0;j<NSTC;j++) {
       if (fc[i][j] > 0.)       nc[i][j] =  1;
       else if (fc[i][j] < 0.)  nc[i][j] = -1;
       else     	               nc[i][j] =  0;
@@ -242,10 +246,14 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
               min_data xfsp[])
 {
   vofi_int n0[NSE][NSE][NSE],i,j,k,i0,j0,k0,ii,jj,kk;
-  vofi_int np0,nm0,icc,check_dir,nmax0,jp,js,jt,npt;
-  vofi_real fc[NDIM][NDIM][NDIM],fd[NDIM][NDIM],x1[NDIM],hh[NDIM],fgrad[NDIM];
+  vofi_int np0,nm0,nneg,icc,check_dir,nmax0,jp,js,jt,npt;
+  vofi_real fc[NSTC][NSTC][NSTC],fd[NSTC][NSTC],hh[NDIM],fgrad[NDIM];
+  /* every component must be defined: the callback is handed all NDIM of
+     them, and the ones above ndim0 have to be the zeros vofi_get_cc_gam
+     padded x0 with, not stack garbage                                   */
+  vofi_real x1[NDIM]={0.,0.,0.,0.};
   vofi_real f0mod,fgradmod,fgradsq;
-  vofi_real sumf[NDIM],curv[NDIM],tmp,hm,fth,have,Kappa;
+  vofi_real sumf[NSTC],curv[NSTC],tmp,hm,fth,have,Kappa;
   vofi_real fx,fy,fz,fxx,fyy,fxy;
   vofi_creal MIN_GRAD=1.0e-04;
   vofi_creal a0=2.34607, a1=16.5515, a2=-5.53054, a3=54.0866;
@@ -288,6 +296,7 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
     
     /* - */
     /* - */
+    nneg = nm0;
     np0 = nm0 = 0;
     for (i=0;i<NSE;i++)
       for (j=0;j<NSE;j++) 
@@ -318,13 +327,15 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
     check_dir = vofi_check_boundary_surface(impl_func,par,x0,h0,f0,xfsp,n0);
     
     /* - */
+      /* nm0 and np0 were overwritten by the recount above: if NO vertex is
+         confident they are both zero, and the old test picked empty
+         whatever the sign really was -- which reported a cell lying
+         entirely inside the reference phase as empty whenever fth
+         exceeded |f| at every vertex (reachable on strongly anisotropic
+         cells). Decide on the RAW sign instead; this branch is only
+         entered when there is no sign change, so it is unambiguous. */
     if (check_dir < 0) {
-      if (nm0 > 0) {
-        icc = 1;
-      }
-      else {
-        icc = 0;
-      }
+      icc = (nneg > 0) ? 1 : 0;
       return icc;
     }
   }
@@ -346,7 +357,7 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
   
   x1[0] = x0[0] + hh[0];
   x1[1] = x0[1] + hh[1];
-  for (k=0;k<NDIM;k++) {
+  for (k=0;k<NSTC;k++) {
     x1[2] = x0[2] + k*hh[2];
     fc[1][1][k] = impl_func(x1,par);
   }
@@ -354,7 +365,7 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
   x1[1] = x0[1] + hh[1];
   for (i=0;i<=NSE;i+=2) {
     x1[0] = x0[0] + i*hh[0];
-    for (k=0;k<NDIM;k++) {
+    for (k=0;k<NSTC;k++) {
       x1[2] = x0[2] + k*hh[2];
       fc[i][1][k] = impl_func(x1,par);
     }
@@ -363,7 +374,7 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
   x1[0] = x0[0] + hh[0];
   for (j=0;j<=NSE;j+=2) {
     x1[1] = x0[1] + j*hh[1];
-    for (k=0;k<NDIM;k++) {
+    for (k=0;k<NSTC;k++) {
       x1[2] = x0[2] + k*hh[2];
       fc[1][j][k] = impl_func(x1,par);
     }
@@ -392,8 +403,8 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
         fgrad[2] += fz/tmp;
   }
   
-  for (i=0;i<NDIM;i++)
-    fgrad[i] = fabs(fgrad[i]);  
+  for (i=0;i<NDIM3;i++)
+    fgrad[i] = fabs(fgrad[i]);
   /* - */
   jt = 2;
   if (fgrad[0] >= fgrad[1]) {
@@ -435,11 +446,11 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
   /* - */
   /* - */
   have = 0.5*(h0[jp] + h0[js]);
-  for (k=0;k<NDIM;k++) {
+  for (k=0;k<NSTC;k++) {
     i0 = k*tdir[0]; j0 = k*tdir[1]; k0 = k*tdir[2];
     sumf[k] = 0.;
-    for (i=0;i<NDIM;i++)
-      for (j=0;j<NDIM;j++) {
+    for (i=0;i<NSTC;i++)
+      for (j=0;j<NSTC;j++) {
 	ii = i0 + i* (vofi_int) sdir[0] + j* (vofi_int) pdir[0];
 	jj = j0 + i* (vofi_int) sdir[1] + j* (vofi_int) pdir[1];
 	kk = k0 + i* (vofi_int) sdir[2] + j* (vofi_int) pdir[2];
@@ -461,7 +472,7 @@ vofi_int vofi_order_dirs_3D(integrand impl_func,vofi_void_cptr par,
     curv[k] = fabs(fxx*fy*fy - 2.*fx*fy*fxy + fx*fx*fyy)/tmp;
   }
   Kappa = tmp = 0.;
-  for (k=0;k<NDIM;k++) {
+  for (k=0;k<NSTC;k++) {
     Kappa += sumf[k]*curv[k];
     tmp += sumf[k];
   }

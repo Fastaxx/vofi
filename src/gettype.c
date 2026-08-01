@@ -44,21 +44,28 @@
 vofi_int vofi_get_cell_type(integrand impl_func,vofi_void_cptr par,
 			     vofi_creal xin[],vofi_creal h0[],vofi_cint ndim0) 
 {
-  vofi_int  icc;
-  vofi_real x0[NDIM];
-  
+  vofi_int  icc,i;
+  vofi_real x0[NDIM],h0l[NDIM];
+
+  /* local copies padded with zeros, as in vofi_get_cc_gam */
+  for (i=0;i<NDIM;i++) {
+    x0[i]  = (i < ndim0) ? xin[i] : 0.;
+    h0l[i] = (i < ndim0) ? h0[i]  : 0.;
+  }
   /* - */
   if (ndim0 == 2) {
-    x0[0] = xin[0]; x0[1] = xin[1]; x0[2] = 0.;
-    icc = vofi_cell_type_2D(impl_func,par,x0,h0);
+    icc = vofi_cell_type_2D(impl_func,par,x0,h0l);
   }
   /* - */
   else if (ndim0 == 3) {
-    x0[0] = xin[0]; x0[1] = xin[1]; x0[2] = xin[2];
-    icc = vofi_cell_type_3D(impl_func,par,x0,h0);
+    icc = vofi_cell_type_3D(impl_func,par,x0,h0l);
   }
   /* - */
-  else {                                                           
+  else if (ndim0 == 4) {
+    icc = vofi_cell_type_4D(impl_func,par,x0,h0l);
+  }
+  /* - */
+  else {
     printf(" EXIT: wrong value of variable ndim0! \n");
     exit(1);
   }
@@ -70,7 +77,7 @@ vofi_int vofi_get_cell_type(integrand impl_func,vofi_void_cptr par,
 vofi_int vofi_cell_type_2D(integrand impl_func,vofi_void_cptr par,
 		            vofi_creal x0[],vofi_creal h0[])
 {
-  vofi_int n0[NSE][NSE],i,j,np0,nm0,icc,check_dir,nmax0;
+  vofi_int n0[NSE][NSE],i,j,np0,nm0,nneg,icc,check_dir,nmax0;
   vofi_real f0[NSE][NSE],x1[NDIM],fgrad[NSE];
   vofi_real f0mod,fgradmod,fgradsq,hm,fth;
   vofi_creal MIN_GRAD=1.0e-04;
@@ -82,7 +89,8 @@ vofi_int vofi_cell_type_2D(integrand impl_func,vofi_void_cptr par,
   nmax0 = 4;  
 
   /* - */
-  x1[2] = x0[2];
+  for (i=0;i<NDIM;i++)
+    x1[i] = x0[i];
   for (i=0;i<NSE;i++)
     for (j=0;j<NSE;j++) {
       x1[0] = x0[0] + i*h0[0];
@@ -104,6 +112,7 @@ vofi_int vofi_cell_type_2D(integrand impl_func,vofi_void_cptr par,
   
   if (np0*nm0 == 0) {    
     /* - */
+    nneg = nm0;
     np0 = nm0 = 0;
     for (i=0;i<NSE;i++)
       for (j=0;j<NSE;j++) {
@@ -130,12 +139,15 @@ vofi_int vofi_cell_type_2D(integrand impl_func,vofi_void_cptr par,
       check_dir = vofi_check_boundary_line(impl_func,par,x0,h0,f0,&xfsp,n0);
     
     /* - */
-    if (check_dir < 0) {
-      if (nm0 > 0) 
-        icc = 1;
-      else 
-        icc = 0;
-    }
+      /* nm0 and np0 were overwritten by the recount above: if NO vertex is
+         confident they are both zero, and the old test picked empty
+         whatever the sign really was -- which reported a cell lying
+         entirely inside the reference phase as empty whenever fth
+         exceeded |f| at every vertex (reachable on strongly anisotropic
+         cells). Decide on the RAW sign instead; this branch is only
+         entered when there is no sign change, so it is unambiguous. */
+    if (check_dir < 0)
+      icc = (nneg > 0) ? 1 : 0;
   }
   
   return icc;
@@ -146,8 +158,8 @@ vofi_int vofi_cell_type_3D(integrand impl_func,vofi_void_cptr par,
                            vofi_creal x0[],vofi_creal h0[])
 {
   vofi_int n0[NSE][NSE][NSE],i,j,k;
-  vofi_int np0,nm0,icc,check_dir,nmax0;
-  vofi_real f0[NSE][NSE][NSE],x1[NDIM],fgrad[NDIM];
+  vofi_int np0,nm0,nneg,icc,check_dir,nmax0;
+  vofi_real f0[NSE][NSE][NSE],x1[NDIM]={0.,0.,0.,0.},fgrad[NDIM];
   vofi_real f0mod,fgradmod,fgradsq,hm,fth;
   vofi_creal MIN_GRAD=1.0e-04;
   min_data  xfsp[3]={{{0.,0.,0.},0.,0.,{0,0,0},0},
@@ -187,6 +199,7 @@ vofi_int vofi_cell_type_3D(integrand impl_func,vofi_void_cptr par,
   
   if (np0*nm0 == 0) {    
     /* - */
+    nneg = nm0;
     np0 = nm0 = 0;
     for (i=0;i<NSE;i++)
       for (j=0;j<NSE;j++) 
@@ -214,12 +227,15 @@ vofi_int vofi_cell_type_3D(integrand impl_func,vofi_void_cptr par,
       check_dir = vofi_check_boundary_surface(impl_func,par,x0,h0,f0,xfsp,n0);
     
     /* - */
-    if (check_dir < 0) {
-      if (nm0 > 0) 
-        icc = 1;
-      else 
-        icc = 0;
-    }
+      /* nm0 and np0 were overwritten by the recount above: if NO vertex is
+         confident they are both zero, and the old test picked empty
+         whatever the sign really was -- which reported a cell lying
+         entirely inside the reference phase as empty whenever fth
+         exceeded |f| at every vertex (reachable on strongly anisotropic
+         cells). Decide on the RAW sign instead; this branch is only
+         entered when there is no sign change, so it is unambiguous. */
+    if (check_dir < 0)
+      icc = (nneg > 0) ? 1 : 0;
   }
   
   return icc;
