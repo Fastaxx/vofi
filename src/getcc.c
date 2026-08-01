@@ -39,7 +39,7 @@
  *         par, coordinates of minimum vertex xin, cell edges h0, integer     *
  *         flags to compute centroid and interface length/area nex, user's    *
  *         number of points npt, printing flags nvis, space dimensions ndim0  *
- *         (1, 2 or 3)                                                        *
+ *         (1, 2, 3 or 4)                                                     *
  * OUTPUT: length/area/volume fraction cc, centroid coordinates and           *
  *         interface count/length/area xex                                    *
  * -------------------------------------------------------------------------- */
@@ -52,6 +52,15 @@
  * polyline / polyhedral surface -- the identical quadrature, not a separate  *
  * approximation. Where the cell carries no interface, xgam is the cell       *
  * centre. Pass xgam = NULL (or nex[1] == 0) to skip the extra work.          *
+ *                                                                           *
+ * ndim0 == 4 orders all four directions once, sweeps the cell along udir and *
+ * hands every hyperplane u = const to the 3D kernel IN THAT SAME FRAME, so   *
+ * the nesting u -> t -> s -> root is a genuine 4D height-function            *
+ * integration and the interface is one graph x_p = H(s,t,u) over the cell.   *
+ * The measure returned in xex[4] is the 3-volume of that graph, integrated   *
+ * on the same nodes -- the analogue of the polyline in 2D and the            *
+ * triangulation in 3D, though computed as an integral rather than            *
+ * reconstructed, so it is not a sum over facets.                             *
  *                                                                           *
  * ndim0 == 1 is the degenerate case and is worth stating plainly: on a       *
  * segment the wet region is an interval, so cc is the root position, the     *
@@ -72,43 +81,61 @@ vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
                       vofi_real xgam[],vofi_cint nex[],
                       vofi_cint npt[],vofi_cint nvis[],vofi_cint ndim0)
 {
-  vofi_int  i,icc,nsub;
+  vofi_int  i,icc,nsub,nxex,ngam;
   vofi_int nsect[NSEG],ndire[NSEG];
-  vofi_real f03D[NSE][NSE][NSE],f02D[NSE][NSE],base[NSEG];
-  vofi_real centroid[NDIM+1+NDIM],x0[NDIM],area,volume,cc;
-  vofi_real pdir[NDIM]={0.,0.,0.},sdir[NDIM]={0.,0.,0.},tdir[NDIM]={0.,0.,0.};
-  min_data  xfsp[5]={{{0.,0.,0.},0.,0.,{0,0,0},0},{{0.,0.,0.},0.,0.,{0,0,0},0},
-                     {{0.,0.,0.},0.,0.,{0,0,0},0},{{0.,0.,0.},0.,0.,{0,0,0},0},
-                     {{0.,0.,0.},0.,0.,{0,0,0},0}}; 
+  vofi_real f04D[NVERH],f03D[NSE][NSE][NSE],f02D[NSE][NSE];
+  vofi_real base[NSEG];
+  vofi_real centroid[2*NDIM+1],x0[NDIM],h0l[NDIM],area,volume,cc;
+  vofi_real pdir[NDIM]={0.,0.,0.,0.},sdir[NDIM]={0.,0.,0.,0.};
+  vofi_real tdir[NDIM]={0.,0.,0.,0.},udir[NDIM]={0.,0.,0.,0.};
+  min_data  xfsp[NXFS];
   len_data xhp[2];
-  
+
+  if (ndim0 < 1 || ndim0 > NDIM) {
+    printf(" EXIT: wrong value of variable ndim0! \n");
+    exit(1);
+  }
+  memset(xfsp,0,sizeof(xfsp));
+  memset(centroid,0,sizeof(centroid));
   xhp[0].np0 = xhp[1].np0 = 0;
+
+  /* Work on LOCAL copies padded with zeros: the caller only ever supplies
+     ndim0 components, while every direction-driven routine inside the
+     library loops over all NDIM of them.                                 */
+  for (i=0;i<NDIM;i++) {
+    x0[i]  = (i < ndim0) ? xin[i] : 0.;
+    h0l[i] = (i < ndim0) ? h0[i]  : 0.;
+  }
+  /* xex holds ndim0 centroid components followed by the interface measure,
+     so it is 4 reals in 1D/2D/3D (the historical layout) and 5 in 4D;
+     xgam holds ndim0 components, historically 3.                         */
+  nxex = (ndim0 == 4) ? 5 : 4;
+  ngam = (ndim0 == 4) ? 4 : 3;
   if (xgam != NULL) {              /* the cell centre, unless an interface */
-    for (i=0;i<NDIM;i++)           /* is found and asked for below         */
+    for (i=0;i<ngam;i++)           /* is found and asked for below         */
       xgam[i] = 0.;
     for (i=0;i<ndim0;i++)
-      xgam[i] = xin[i] + 0.5*h0[i];
+      xgam[i] = x0[i] + 0.5*h0l[i];
   }
-  for (i=0;i<=NDIM;i++)
+  for (i=0;i<nxex;i++)
     xex[i] = 0.0;
   if (ndim0 == 2) {                                               /* - */
-    x0[0] = xin[0]; x0[1] = xin[1]; x0[2] = 0.;
-    icc = vofi_order_dirs_2D(impl_func,par,x0,h0,pdir,sdir,f02D,&xfsp[0]);
+    icc = vofi_order_dirs_2D(impl_func,par,x0,h0l,pdir,sdir,f02D,&xfsp[0]);
     if (icc >= 0) {
       cc = (vofi_real) icc;
       if (icc > 0 && nex[0] > 0) {
         for (i=0;i<NSE;i++)
-          xex[i] = x0[i] + 0.5*h0[i];
+          xex[i] = x0[i] + 0.5*h0l[i];
       }
       return cc;
     }
-    nsub = vofi_get_limits_2D(impl_func,par,x0,h0,f02D,xfsp[0],base,
+    nsub = vofi_get_limits_2D(impl_func,par,x0,h0l,f02D,xfsp[0],base,
 			      pdir,sdir,nsect,ndire);
-    area = vofi_get_area(impl_func,par,x0,h0,base,pdir,sdir,xhp,centroid,
-			 nex[0],npt,nsub,xfsp[0].ipt,nsect,ndire);
-    cc = area/(h0[0]*h0[1]);
+    area = vofi_get_area(impl_func,par,x0,h0l,base,pdir,sdir,xhp,centroid,
+			 nex[0],npt,nsub,xfsp[0].ipt,nsect,ndire,NULL);
+    cc = area/(h0l[0]*h0l[1]);
     if (nvis[0] > 0)
-      tecplot_heights(x0,h0,pdir,sdir,xhp);
+      tecplot_heights(x0,h0l,pdir,sdir,xhp);
     if (nex[0] > 0 && area > 0.) {
       centroid[0] = centroid[0]/area;
       centroid[1] = centroid[1]/area;
@@ -118,9 +145,10 @@ vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
     }
     if (nex[1] > 0) {
       vofi_real scent[NDIM],*psc;
-      scent[0] = scent[1] = scent[2] = 0.;
+      for (i=0;i<NDIM;i++)
+        scent[i] = 0.;
       psc = (xgam != NULL) ? scent : NULL;
-      xex[3] = vofi_interface_length(impl_func,par,x0,h0,pdir,sdir,xhp,psc,
+      xex[3] = vofi_interface_length(impl_func,par,x0,h0l,pdir,sdir,xhp,psc,
                                      nvis[1]);
       if (psc != NULL && xex[3] > 0.)
         for (i=0;i<NSE;i++)
@@ -129,46 +157,78 @@ vofi_real vofi_get_cc_gam(integrand impl_func,vofi_void_cptr par,
     }
   }
   else if (ndim0 == 3) {                                          /* - */
-    x0[0] = xin[0]; x0[1] = xin[1]; x0[2] = xin[2];
-    icc = vofi_order_dirs_3D(impl_func,par,x0,h0,pdir,sdir,tdir,f03D,xfsp);
+    icc = vofi_order_dirs_3D(impl_func,par,x0,h0l,pdir,sdir,tdir,f03D,xfsp);
     if (icc >= 0) {
       cc = (vofi_real) icc;
       if (icc > 0 && nex[0] > 0) {
-        for (i=0;i<NDIM;i++)
-          xex[i] = x0[i] + 0.5*h0[i];
+        for (i=0;i<ndim0;i++)
+          xex[i] = x0[i] + 0.5*h0l[i];
       }
       return cc;
     }
-    nsub = vofi_get_limits_3D(impl_func,par,x0,h0,f03D,xfsp,base,pdir,sdir,
+    nsub = vofi_get_limits_3D(impl_func,par,x0,h0l,f03D,xfsp,base,pdir,sdir,
                               tdir);
-    volume = vofi_get_volume(impl_func,par,x0,h0,base,pdir,sdir,tdir,centroid,
-                             nex,npt,nsub,xfsp[4].ipt,nvis);
-    cc = volume/(h0[0]*h0[1]*h0[2]);
+    volume = vofi_get_volume(impl_func,par,x0,h0l,base,pdir,sdir,tdir,centroid,
+                             nex,npt,nsub,xfsp[4].ipt,nvis,NULL);
+    cc = volume/(h0l[0]*h0l[1]*h0l[2]);
 
     if (nex[0] > 0 && volume > 0.) {
       centroid[0] = centroid[0]/volume;
       centroid[1] = centroid[1]/volume;
       centroid[2] = centroid[2]/volume;
-      for (i=0;i<NDIM;i++)
-        xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i] + 
+      for (i=0;i<ndim0;i++)
+        xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i] +
                  centroid[2]*tdir[i];
     }
     if (nex[1] > 0) {
       xex[3] = centroid[3];
       if (xgam != NULL && centroid[3] > 0.)
-        for (i=0;i<NDIM;i++)
+        for (i=0;i<ndim0;i++)
           xgam[i] = x0[i] + (centroid[4]/centroid[3])*pdir[i] +
                             (centroid[5]/centroid[3])*sdir[i] +
                             (centroid[6]/centroid[3])*tdir[i];
     }
   }
+  else if (ndim0 == 4) {                                          /* - */
+    icc = vofi_order_dirs_4D(impl_func,par,x0,h0l,pdir,sdir,tdir,udir,f04D,
+                             xfsp);
+    if (icc >= 0) {
+      cc = (vofi_real) icc;
+      if (icc > 0 && nex[0] > 0) {
+        for (i=0;i<ndim0;i++)
+          xex[i] = x0[i] + 0.5*h0l[i];
+      }
+      return cc;
+    }
+    nsub = vofi_get_limits_4D(impl_func,par,x0,h0l,f04D,xfsp,base,pdir,sdir,
+                              tdir,udir);
+    volume = vofi_get_hypervolume(impl_func,par,x0,h0l,base,pdir,sdir,tdir,
+                                  udir,centroid,nex,npt,nsub,xfsp[IXC4].ipt);
+    cc = volume/(h0l[0]*h0l[1]*h0l[2]*h0l[3]);
+
+    if (nex[0] > 0 && volume > 0.) {
+      for (i=0;i<ndim0;i++)
+        centroid[i] = centroid[i]/volume;
+      for (i=0;i<ndim0;i++)
+        xex[i] = x0[i] + centroid[0]*pdir[i] + centroid[1]*sdir[i] +
+                 centroid[2]*tdir[i] + centroid[3]*udir[i];
+    }
+    if (nex[1] > 0) {
+      xex[4] = centroid[4];
+      if (xgam != NULL && centroid[4] > 0.)
+        for (i=0;i<ndim0;i++)
+          xgam[i] = x0[i] + (centroid[5]/centroid[4])*pdir[i] +
+                            (centroid[6]/centroid[4])*sdir[i] +
+                            (centroid[7]/centroid[4])*tdir[i] +
+                            (centroid[8]/centroid[4])*udir[i];
+    }
+  }
   else if (ndim0 == 1) {                                          /* - */
-    vofi_real dir[NDIM]={1.,0.,0.},xs[NDIM]={0.,0.,0.},s0[4];
+    vofi_real dir[NDIM]={1.,0.,0.,0.},xs[NDIM]={0.,0.,0.,0.},s0[4];
     vofi_real f0,f1,hh,sz;
     vofi_int fsign;
 
-    x0[0] = xin[0]; x0[1] = 0.; x0[2] = 0.;
-    hh = h0[0];
+    hh = h0l[0];
     xs[0] = x0[0];      f0 = impl_func(xs,par);
     xs[0] = x0[0] + hh; f1 = impl_func(xs,par);
 

@@ -296,16 +296,21 @@ vofi_int vofi_get_ext_intersections(integrand impl_func,vofi_void_cptr par,
         normdir += ext_dir[i]*ext_dir[i];
       }  
       normdir = sqrt(normdir) + EPS_NOT0; 
-      for (i=0;i<NDIM;i++) {              
+      for (i=0;i<NDIM;i++) {
         ext_dir[i] = ext_dir[i]/normdir;
         d1 = SGN0P(ext_dir[i]);
         d2 = fabs(ext_dir[i]) + EPS_NOT0;
-        a1 = (x0[i] - mp1[i])/(d1*d2);
-        a2 = (x0[i] + h0[i] - mp1[i])/(d1*d2);
-        ss[i] = MAX(a1,a2);
+        if (d2 < EPS_ROOT)
+          ss[i] = SS_FREE;                 /* - */
+        else {
+          a1 = (x0[i] - mp1[i])/(d1*d2);
+          a2 = (x0[i] + h0[i] - mp1[i])/(d1*d2);
+          ss[i] = MAX(a1,a2);
+        }
       }
-      ssy = MIN(ss[0],ss[1]);      
-      ssy = MIN(ssy,ss[2]);             
+      ssy = ss[0];
+      for (i=1;i<NDIM;i++)
+        ssy = MIN(ssy,ss[i]);
       sst = MIN(1.2*sst,ssy);
       /* - */
       if (!ipt || sss < tol2 || sst < EPS_ROOT) {       

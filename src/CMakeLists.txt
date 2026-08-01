@@ -7,9 +7,15 @@ add_library(vofi
 	getlimits.c
 	getmin.c
 	gettype.c
+	checkboundary4d.c
+	getintersections4d.c
+	getlimits4d.c
+	getmin4d.c
 	getzero.c
 	integrate.c
+	integrate4d.c
 	orderdirs.c
+	orderdirs4d.c
 	tecplot.c
 	triangulate.c
 )

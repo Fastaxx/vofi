@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #ifdef __cplusplus
 #define Extern extern "C"
@@ -69,11 +70,26 @@
 #define NEAR_EDGE_RATIO 2.0e-02
 #define MAX_ITER_ROOT 15
 #define MAX_ITER_MINI 50  
-#define NDIM   3
-#define NVER   4
+/* NDIM is the STORAGE dimension: every coordinate and direction array in the
+   library is this long, and the components above ndim0 are zero. It is 4 so
+   that one set of direction-vector primitives serves 1D, 2D, 3D and 4D. Two
+   constants that used to ride on NDIM but never meant "dimension" are now
+   spelled out: NSTC is the width of the 3-point central stencils, NSCT the
+   largest number of sectors a side can be cut into.                        */
+#define NDIM   4
+#define NDIM3  3     /* a genuine 3-vector (local triangle coordinates)     */
+#define NSTC   3     /* points per axis in the central-difference stencils  */
+#define NSCT   3     /* max sectors along a side handled by vofi_sector_new */
+#define NVER   4     /* vertices of a 2D face                               */
+#define NVERC  8     /* vertices of a 3D cell (a 3-face of a 4D cell)       */
+#define NVERH 16     /* vertices of a 4D cell                               */
 #define NSE    2
-#define NSEG  10
+#define NSEG  48
 #define NGLM  20
+/* stand-in for "this direction is not constrained by the box": used where a
+   search direction has a vanishing component along an axis, so that the
+   axis' box constraint must not enter the MIN that bounds the step        */
+#define SS_FREE 1.0e+30
 
 typedef double vofi_real;
 typedef const double vofi_creal;
@@ -103,21 +119,23 @@ typedef double (*integrand) (vofi_creal [],vofi_void_cptr);
          [2]) (0/1) without/with sign change on the upper sec./ter. face, 
    ipt:  tentative number of integration points                               */
 typedef struct {
-  vofi_real xval[NDIM]; 
-  vofi_real fval; 
-  vofi_real sval; 
-  vofi_int isc[NDIM]; 
+  vofi_real xval[NDIM];
+  vofi_real fval;
+  vofi_real sval;
+  vofi_int isc[NDIM+1];
   vofi_int ipt;
 } min_data;
 
 /* dir_data structure:
-   ind1,ind2: indices in {0,1} to locate the vertex in a face (xy,yz,xz), 
-   swt1,swt2: switches to turn on/off the components of the initial gradient, 
+   ind1,ind2,(ind3): indices in {0,1} to locate the vertex in a face (xy,yz,xz)
+                     or, in 4D, in one of the eight cubic 3-faces,
+   swt1,swt2,(swt3): switches to turn on/off the components of the initial
+                     gradient,
    consi: if = 0 no sign change is possible, otherwise sign to have f>0       */
-typedef struct { 
-  int ind1; int ind2;               
-  int swt1; int swt2; 
-  int consi;    
+typedef struct {
+  int ind1; int ind2; int ind3;
+  int swt1; int swt2; int swt3;
+  int consi;
 } dir_data;
 
 /* len_data structure:
@@ -135,14 +153,32 @@ typedef struct {
   vofi_real htp[NGLM+2];
 } len_data; 
 
+/* meas_acc: the 4D interface measure, accumulated where the heights are
+   actually computed. With one frame for the whole cell the interface is the
+   graph x_p = H(s,t,u), so its 3-volume is the integral of
+   sqrt(1 + |grad H|^2) = |grad f| / |df/dp| over the same (s,t,u) nodes the
+   hypervolume quadrature already visits -- no second traversal, no separate
+   surface reconstruction. wout carries the product of the outer (t and u)
+   quadrature weights; tloc and uloc the current coordinates in the local
+   frame. NULL in 1D, 2D and 3D, which keep their geometric measures.     */
+typedef struct {
+  integrand  func;
+  void      *par;             /* not vofi_void_cptr: this member is assigned */
+  vofi_int   jp;              /* global axis carrying pdir                */
+  vofi_real  wout;            /* outer quadrature weight                  */
+  vofi_real  tloc, uloc;      /* current t and u in the local frame       */
+  vofi_real  dh[NDIM];        /* central-difference step per global axis  */
+  vofi_real  meas;            /* accumulated 3-volume of the interface    */
+  vofi_real  mom[NDIM];       /* accumulated first moment, local frame    */
+} meas_acc;
+
 /*------------ function prototypes ------------*/
 
 /* function to compute the root along an oriented segment */
 vofi_real vofi_get_segment_zero(integrand,vofi_void_cptr,vofi_creal [],
-                                vofi_creal [],vofi_real [],vofi_cint); 
+                                vofi_creal [],vofi_real [],vofi_cint);
 
-
-/* functions to check consistency with a minimum along a cell side, */ 
+/* functions to check consistency with a minimum along a cell side, */
 /* a line, a cell face or and edge intersection                     */
 vofi_int vofi_check_side_consistency(integrand,vofi_void_cptr,vofi_creal [],
                                      vofi_creal [],vofi_creal [],vofi_creal);
@@ -210,14 +246,83 @@ vofi_int vofi_get_limits_inner_2D(integrand,vofi_void_cptr,vofi_creal [],
                                   vofi_int [],vofi_cint);
 vofi_int vofi_get_limits_edge_2D(integrand,vofi_void_cptr,vofi_creal [],
                                  vofi_creal [],min_data *,vofi_real [],
-                                 vofi_creal [],vofi_creal [],vofi_cint);
+                                 vofi_creal [],vofi_creal []);
 void vofi_reorder(vofi_real [],vofi_int [],vofi_int);
 vofi_int vofi_rm_segs(vofi_real [],vofi_int [],vofi_int);
-void vofi_sector_new(vofi_int [][NDIM],vofi_int [],vofi_int [],vofi_cint,
+void vofi_sector_new(vofi_int [][NSCT],vofi_int [],vofi_int [],vofi_cint,
                      vofi_cint,vofi_cint,vofi_cint);
 void vofi_sector_old(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                      vofi_creal [],vofi_creal [],vofi_creal [],vofi_int [],
                      vofi_int [],vofi_cint);
+
+/* threshold on |f| at the 16 vertices of a 4D cell, and the gradient it is
+   built from (see vofi_hyper_fth in orderdirs4d.c)                        */
+vofi_real vofi_hyper_fth(vofi_creal [],vofi_creal [],vofi_real []);
+
+/* Size of the min_data table handed around by the direction-ordering
+   routines. 3D uses [0..3] for the four tertiary sides and [4] for the
+   two faces normal to pdir. 4D uses [0..7] for the eight cell edges
+   parallel to udir -- edge le carries the {0,1} indices of the three
+   non-u axes in the bits of le, least significant bit = lowest axis --
+   and [IXC4] for the tentative point count plus the seed point left by
+   the boundary check.                                                     */
+#define NXFS   9
+#define IXC4   8
+
+/* consistency check and minimum search inside a cubic 3-face of a 4D cell:
+   the 3-direction extension of vofi_check_face_consistency/vofi_get_face_min */
+dir_data vofi_check_cell_consistency(integrand,vofi_void_cptr,vofi_creal [],
+                                     vofi_creal [],vofi_creal [],vofi_creal [],
+                                     vofi_creal [],vofi_creal []);
+vofi_int vofi_get_cell_min(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
+                           vofi_creal [],vofi_creal [],vofi_creal [],
+                           vofi_creal [],min_data *,dir_data);
+
+/* look for an interface that lives entirely inside the boundary of the 4D
+   cell, i.e. inside one of its eight cubic 3-faces                       */
+vofi_int vofi_check_boundary_hyper(integrand,vofi_void_cptr,vofi_creal [],
+                                   vofi_creal [],vofi_creal [],min_data *,
+                                   vofi_int []);
+
+/* cell type, ordered directions, external limits and quadrature (4D) */
+vofi_int vofi_cell_type_4D(integrand,vofi_void_cptr,vofi_creal [],vofi_creal []);
+vofi_int vofi_order_dirs_4D(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
+                            vofi_real [],vofi_real [],vofi_real [],vofi_real [],
+                            vofi_real [],min_data []);
+vofi_int vofi_get_limits_4D(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
+                            vofi_creal [],min_data [],vofi_real [],
+                            vofi_creal [],vofi_creal [],vofi_creal [],
+                            vofi_creal []);
+vofi_int vofi_check_hyperplane(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_creal [],vofi_real [],min_data [],
+                               vofi_int *);
+vofi_int vofi_get_uext_intersections(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],min_data,vofi_real [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_cint);
+vofi_real vofi_get_hypervolume(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_real [],vofi_cint [],vofi_cint [],
+                               vofi_cint,vofi_cint);
+void vofi_meas_add(meas_acc *,vofi_creal [],vofi_creal [],vofi_creal,
+                   vofi_creal,vofi_creal,vofi_creal,vofi_cint);
+
+/* the direction-generic form of vofi_check_boundary_surface, and the 4D
+   counterparts of vofi_check_secter_face / vofi_check_tertiary_side      */
+vofi_int vofi_check_boundary_cell(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],vofi_real [][NSE][NSE],min_data [],
+                               vofi_int [][NSE][NSE],vofi_creal [],
+                               vofi_creal [],vofi_creal []);
+void vofi_check_secter_cell(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               min_data *,vofi_creal);
+void vofi_check_quaternary_side(integrand,vofi_void_cptr,vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               vofi_creal [],vofi_creal [],vofi_creal [],
+                               min_data [],vofi_creal);
 
 /* functions to compute the function minimum along a segment or */
 /* in a cell face                                               */
@@ -239,11 +344,12 @@ vofi_int vofi_cell_type_3D(integrand,vofi_void_cptr,vofi_creal [],
 vofi_real vofi_get_area(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                         vofi_creal [],vofi_creal [],vofi_creal [],
                         len_data [],vofi_real [],vofi_cint,vofi_cint [],
-                        vofi_cint,vofi_cint,vofi_int [],vofi_int []);
+                        vofi_cint,vofi_cint,vofi_int [],vofi_int [],
+                        meas_acc *);
 double vofi_get_volume(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                        vofi_creal [],vofi_creal [],vofi_creal [],
                        vofi_creal [],vofi_real [],vofi_cint [],vofi_cint [],
-                       vofi_cint,vofi_cint,vofi_cint []);
+                       vofi_cint,vofi_cint,vofi_cint [],meas_acc *);
 
 /* functions to compute the cell type and, if cut, to order coordinate */ 
 /* directions and to compute tentative number of integration points    */
@@ -275,6 +381,8 @@ double vofi_get_cc(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
 double vofi_get_cc_gam(integrand,vofi_void_cptr,vofi_creal [],vofi_creal [],
                        double [],double [],vofi_cint [],vofi_cint [],
                        vofi_cint [],vofi_cint);
+vofi_int vofi_get_cell_type(integrand,vofi_void_cptr,vofi_creal [],
+                            vofi_creal [],vofi_cint);
 
 /* the last argument accumulates the area-weighted interface centroid in  */
 /* the (pdir,sdir,tdir) frame; pass NULL not to compute it               */

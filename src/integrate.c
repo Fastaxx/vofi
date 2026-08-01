@@ -51,7 +51,8 @@ vofi_real vofi_get_area(integrand impl_func,vofi_void_cptr par,vofi_creal x0[],
                         vofi_creal h0[],vofi_creal base[],vofi_creal pdir[],
                         vofi_creal sdir[],len_data xhp[],vofi_real centroid[],
                         vofi_cint ncen,vofi_cint npt[],vofi_cint nsub,
-                        vofi_cint nptmp,vofi_int nsect[],vofi_int ndire[])
+                        vofi_cint nptmp,vofi_int nsect[],vofi_int ndire[],
+                        meas_acc *macc)
 {
   vofi_int i,j,k,ns,npts,f_sign,it0;
   vofi_real x1[NDIM],x20[NDIM],x21[NDIM],s0[4],fse[NSE];
@@ -67,8 +68,9 @@ vofi_real vofi_get_area(integrand impl_func,vofi_void_cptr par,vofi_creal x0[],
     hp += pdir[i]*h0[i];
     hs += sdir[i]*h0[i];
   }
-  hm = MAX(h0[0],h0[1]);
-  hm = MAX(hm,h0[2]);
+  hm = h0[0];
+  for (i=1;i<NDIM;i++)
+    hm = MAX(hm,h0[i]);
   for (ns=1;ns<=nsub;ns++) {                     /* - */
     ds = base[ns] - base[ns-1];
     mdpt = 0.5*(base[ns] + base[ns-1]);
@@ -120,6 +122,9 @@ vofi_real vofi_get_area(integrand impl_func,vofi_void_cptr par,vofi_creal x0[],
                                                 f_sign);
         xhp[it0].htp[k] = s0[3];
         quada += (*ptw)*xhp[it0].ht0[k];
+        if (macc != NULL)
+          vofi_meas_add(macc,x20,pdir,0.5*ds*(*ptw),hp,xhp[it0].ht0[k],
+                        xhp[it0].xt0[k],f_sign);
         if (ncen > 0) {
           quadp += (*ptw)*0.5*xhp[it0].ht0[k]*xhp[it0].ht0[k];
           quads += (*ptw)*xhp[it0].ht0[k]*xhp[it0].xt0[k];
@@ -198,8 +203,9 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
                    vofi_creal h0[],vofi_creal base_ext[],vofi_creal pdir[],
                    vofi_creal sdir[],vofi_creal tdir[],vofi_real centroid[],
                    vofi_cint nex[],vofi_cint npt[],vofi_cint nsub_ext,
-                   vofi_cint nptmp,vofi_cint nvis[])
+                   vofi_cint nptmp,vofi_cint nvis[],meas_acc *macc)
 {
+  vofi_real wu = 0.;
   vofi_int i,j,nt,k,nexpt,sect_hexa,nsub_int,nintmp;
   vofi_int nsect[NSEG],ndire[NSEG],nptin[2];
   vofi_real x1[NDIM],cent_2D[NDIM],base_int[NSEG],xmidt[NGLM+2];
@@ -211,16 +217,20 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
   min_data xfs;
   
   volume = surfer = hp = hs = ht = xp = xs = xt = 0.;
-  scent[0] = scent[1] = scent[2] = 0.;
+  if (macc != NULL)
+    wu = macc->wout;                    /* the weight of this hyperplane */
+  for (i=0;i<NDIM;i++)
+    scent[i] = 0.;
   psc = (nex[1] > 0) ? scent : NULL;   /* no centroid work if unrequested */
   for (i=0;i<NDIM;i++) { 
     hp += pdir[i]*h0[i];
     hs += sdir[i]*h0[i];
     ht += tdir[i]*h0[i];
   }
-  hm = MAX(h0[0],h0[1]);
-  hm = MAX(hm,h0[2]);
- 
+  hm = h0[0];
+  for (i=1;i<NDIM;i++)
+    hm = MAX(hm,h0[i]);
+
   for (nt=1;nt<=nsub_ext;nt++) {                    /* - */
     dt = base_ext[nt] - base_ext[nt-1];        
     mdpt = 0.5*(base_ext[nt] + base_ext[nt-1]);
@@ -266,8 +276,13 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
         nsub_int = vofi_get_limits_inner_2D(impl_func,par,x1,h0,&xfs,base_int,
                                             pdir,sdir,nsect,ndire,sect_hexa);
         xhpn[0].np0 = xhpn[1].np0 = 0;
+        if (macc != NULL) {
+          macc->wout = wu*0.5*dt*(*ptw_ext);
+          macc->tloc = xit;
+        }
         area = vofi_get_area(impl_func,par,x1,h0,base_int,pdir,sdir,xhpn,
-                             cent_2D,nex[0],npt,nsub_int,nptmp,nsect,ndire);
+                             cent_2D,nex[0],npt,nsub_int,nptmp,nsect,ndire,
+                             macc);
         if (nvis[0] > 0)
           tecplot_heights(x1,h0,pdir,sdir,xhpn);
         if (nex[1] > 0) {      
@@ -276,7 +291,7 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
             for (i=0;i<NDIM;i++) 
               x1[i] = x0[i] + tdir[i]*xmidt[0];
             nintmp = vofi_get_limits_edge_2D(impl_func,par,x1,h0,&xfs,
-                                             base_int,pdir,sdir,nsub_int);
+                                             base_int,pdir,sdir);
             nptin[0] = xhpn[0].np0; nptin[1] = xhpn[1].np0; 
             xhpo[0].np0 = xhpo[1].np0 = 0;
             vofi_edge_points(impl_func,par,x1,h0,base_int,pdir,sdir,xhpo,
@@ -292,7 +307,7 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
             for (i=0;i<NDIM;i++) 
               x1[i] = x0[i] + tdir[i]*xmidt[nexpt+1];
             nintmp = vofi_get_limits_edge_2D(impl_func,par,x1,h0,&xfs,
-                                             base_int,pdir,sdir,nsub_int);
+                                             base_int,pdir,sdir);
             nptin[0] = xhpo[0].np0; nptin[1] = xhpo[1].np0; 
             xhpn[0].np0 = xhpn[1].np0 = 0;
             vofi_edge_points(impl_func,par,x1,h0,base_int,pdir,sdir,xhpn,
@@ -318,6 +333,8 @@ vofi_real vofi_get_volume(integrand impl_func,vofi_void_cptr par,vofi_creal x0[]
       }
     }
   }
+  if (macc != NULL)
+    macc->wout = wu;
   centroid[0] = xp;
   centroid[1] = xs;
   centroid[2] = xt;

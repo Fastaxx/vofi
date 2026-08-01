@@ -48,7 +48,7 @@ vofi_real vofi_get_segment_zero(integrand impl_func,vofi_void_cptr par,
   vofi_int not_conv,i,iter,gensec;
   vofi_real xs[NDIM],sl,sr,ss,fs,dss,dsold,ds2,fps,sz,s1,s2,f1,f2;
   vofi_real fl=-EPS_SEGM,fr=EPS_SEGM;
-  vofi_real sv[NDIM],fv[NDIM];
+  vofi_real sv[NSTC],fv[NSTC];
   
   sl = 0.; sr = s0[0];
   not_conv = 1;

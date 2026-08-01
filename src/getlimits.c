@@ -67,7 +67,7 @@ vofi_int vofi_get_limits_2D(integrand impl_func,vofi_void_cptr par,
                   vofi_creal sdir[],vofi_int nsect[],vofi_int ndire[])
 {
   vofi_int i,k,nsub,inters,down2up,atleast1,ncheck,iside,isect;
-  vofi_int basei[NSEG],nbt[NSE]={0,0},sign_sect[NSE][NDIM]={{0,0,0},{0,0,0}};
+  vofi_int basei[NSEG],nbt[NSE]={0,0},sign_sect[NSE][NSCT]={{0,0,0},{0,0,0}};
   vofi_real x1[NDIM],fse[NSE],hs,fsum;
   
   baser[0] = hs = 0.;
@@ -223,7 +223,7 @@ vofi_int vofi_check_plane(integrand impl_func,vofi_void_cptr par,
 {
   vofi_int i,k,consi,f2pos,sign_change,nsub;
   vofi_int inters,nointer,down2up,atleast1,ncheck,iside,isect;
-  vofi_int basei[NSEG],nbt[NSE]={0,0},sign_sect[NSE][NDIM]={{0,0,0},{0,0,0}};
+  vofi_int basei[NSEG],nbt[NSE]={0,0},sign_sect[NSE][NSCT]={{0,0,0},{0,0,0}};
   vofi_real x1[NDIM],x2[NDIM],fse[NSE],hs,fsum;
   min_data xfsl={{0.,0.,0.},0.,0.,{0,0,0},0};
 
@@ -415,8 +415,7 @@ vofi_int vofi_get_limits_inner_2D(integrand impl_func,vofi_void_cptr par,
 /* -------------------------------------------------------------------------- */
 vofi_int vofi_get_limits_edge_2D(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],min_data *xfs_pt,
-                         vofi_real baser[],vofi_creal pdir[],vofi_creal sdir[],
-                         vofi_cint nsub_int)
+                         vofi_real baser[],vofi_creal pdir[],vofi_creal sdir[])
 {
   vofi_int basei[NSEG],i,k,f2pos,sign_change,nsub,inters;
   vofi_real x1[NDIM],x2[NDIM],fse[NSE],hs,fs,fsum;
@@ -565,7 +564,7 @@ vofi_int vofi_rm_segs(vofi_real baser[],vofi_int basei[],vofi_int nsub)
   return nsub;
 }
 /* -------------------------------------------------------------------------- */
-void vofi_sector_new(vofi_int sign_sect[][NDIM],vofi_int nsect[],
+void vofi_sector_new(vofi_int sign_sect[][NSCT],vofi_int nsect[],
 		     vofi_int ndire[],vofi_cint nsub,vofi_cint iside,
 		     vofi_cint isect,vofi_cint down2up)
 {

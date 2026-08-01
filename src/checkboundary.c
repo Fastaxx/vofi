@@ -56,7 +56,7 @@ vofi_int vofi_check_boundary_line(integrand impl_func,vofi_void_cptr par,
 {
   vofi_int i,j,k;
   vofi_int nx[NSE]={1,1},ny[NSE]={1,1},consi,sign_change,f2pos,check_dir;
-  vofi_creal sidedirx[NDIM]={1.,0.,0.},sidediry[NDIM]={0.,1.,0.};
+  vofi_creal sidedirx[NDIM]={1.,0.,0.,0.},sidediry[NDIM]={0.,1.,0.,0.};
   vofi_real fse[NSE],x1[NDIM];
   min_data xfsl={{0.,0.,0.},0.,0.,{0,0,0},0};
 
@@ -158,8 +158,8 @@ vofi_int vofi_check_boundary_surface(integrand impl_func,vofi_void_cptr par,
 {
   vofi_int i,j,k,m;
   vofi_int nx[NSE]={1,1},ny[NSE]={1,1},nz[NSE]={1,1},sign_change,check_dir;
-  vofi_creal sidedirx[NDIM]={1.,0.,0.},sidediry[NDIM]={0.,1.,0.},
-             sidedirz[NDIM]={0.,0.,1.};
+  vofi_creal sidedirx[NDIM]={1.,0.,0.,0.},sidediry[NDIM]={0.,1.,0.,0.},
+             sidedirz[NDIM]={0.,0.,1.,0.};
   vofi_real fve[NVER],x1[NDIM];
   dir_data ipsc;
   min_data xfsl={{0.,0.,0.},0.,0.,{0,0,0},0};
