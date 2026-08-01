@@ -85,7 +85,7 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
 {
   vofi_int i,j,nsec,npn,npo,f_sign,it0,km;
   vofi_int djl,djc,djr,npa,nmin,nmax;
-  vofi_real xa[NDIM],xb[NDIM],xc[NDIM],x1[NDIM],x2[NDIM];
+  vofi_real xa[NDIM3],xb[NDIM3],xc[NDIM3],x1[NDIM],x2[NDIM];
   vofi_real hp,surfer,s0[4],sc,tc,hc,t1,t2,dxl,dxr,hsum,ratio;
   vofi_real *pts1,*pte1,*pts2,*pte2,*psa,*psb,*pth1,*pth2,*pha,*phb;
     
@@ -104,6 +104,17 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
   for (it0=0; it0<nsec; it0++) {
     npn = xhpn[it0].np0;
     npo = xhpo[it0].np0;
+    /* A ribbon of triangles is built by PAIRING the height points of two
+       adjacent planes. When one of the planes carries no height points in
+       this sector -- the sector count legitimately changes from plane to
+       plane, e.g. where a torus hole opens -- there is nothing to pair
+       with: pte2 would be xt0[-1], the pairing loop would walk off the
+       node arrays, and htp[1] below would be read uninitialized (which is
+       what made the interface AREA of such cells depend on stack garbage).
+       Skip the sector instead; the surface it would have contributed is
+       bounded by the strip between the two planes.                       */
+    if (npn <= 0 || npo <= 0)
+      continue;
     f_sign = xhpn[it0].f_sign;
     djl = djr = djc = -1;
     nmin = MIN(npn,npo);
@@ -211,9 +222,9 @@ vofi_real vofi_interface_surface(integrand impl_func,vofi_void_cptr par,
 vofi_real vofi_triarea(vofi_creal x1[],vofi_creal x2[],vofi_creal x3[])
 {
   vofi_int i;
-  vofi_real u[NDIM],v[NDIM],area;
+  vofi_real u[NDIM3],v[NDIM3],area;
 
-  for (i=0;i<NDIM;i++) {
+  for (i=0;i<NDIM3;i++) {
     u[i] = x2[i] - x1[i]; v[i] = x3[i] - x1[i];
   }
   area = 0.5*sqrt( Sq(u[1]*v[2] - u[2]*v[1]) + Sq(u[2]*v[0] - u[0]*v[2]) +

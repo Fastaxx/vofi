@@ -82,7 +82,7 @@ dir_data vofi_check_face_consistency(integrand impl_func,vofi_void_cptr par,
                          vofi_creal x0[],vofi_creal h0[],vofi_creal dir1[],
                          vofi_creal dir2[],vofi_creal fv[])
 {
-  vofi_int i,is1,is2,consi;
+  vofi_int i,is1 = 1,is2 = 1,consi;
   vofi_real xx[NDIM],x1[NDIM],x2[NDIM],fl[NVER],f0,f1,f2,dh1,dh2,h1,h2;
   dir_data ipsc;
   

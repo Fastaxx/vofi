@@ -216,7 +216,7 @@ vofi_int vofi_get_segment_min(integrand impl_func,vofi_void_cptr par,
             tol = EPS_M*fabs(su) + EPS_LOC;  
             for (j=-1;j<=1;j=j+2) {  
               sz = su +j*tol;
-              for (i=0; i<3; i++)
+              for (i=0; i<NDIM; i++)
                 xs[i] = x0[i] + sz*dir[i];
               fz = ifsign*impl_func(xs,par);
               if (fz > fu)
@@ -249,7 +249,7 @@ vofi_int vofi_get_face_min(integrand impl_func,vofi_void_cptr par,
 			   vofi_creal dir2[],vofi_creal fve[],min_data *xfs_pt,
 			   dir_data ipsc)
 {
-  vofi_int i,not_conv,iter,k,ipt,iss,f2pos,sign_change;
+  vofi_int i,not_conv,iter,k,ipt,iss,f2pos,sign_change = 0;
   vofi_real xs0[NDIM],xs1[NDIM],x1f[NDIM],x1b[NDIM],x2f[NDIM],x2b[NDIM];
   vofi_real res[NDIM],hes[NDIM],rs0[NDIM],hs0[NDIM];
   vofi_real pcrs[NDIM],nmdr[NDIM],cndr[NDIM],ss[NDIM],fse[NSE];
@@ -300,15 +300,16 @@ vofi_int vofi_get_face_min(integrand impl_func,vofi_void_cptr par,
     d1 = SGN0P(nmdr[i]);
     d2 = fabs(nmdr[i]) + EPS_NOT0;
     if (d2 < EPS_ROOT)
-      ss[i] = 1000.*h0[i];
+      ss[i] = SS_FREE;                 /* - */
     else {
       a1 = (x0[i] - xs0[i])/(d1*d2);
       a2 = (x0[i] + h0[i] - xs0[i])/(d1*d2);
       ss[i] = MAX(a1,a2);
     }
   }
-  ss0 = MIN(ss[0],ss[1]);
-  ss0 = MIN(ss0,ss[2]);
+  ss0 = ss[0];
+  for (i=1;i<NDIM;i++)
+    ss0 = MIN(ss0,ss[i]);
   for (i=0;i<NDIM;i++) 
     xs1[i] = xs0[i] + ss0*nmdr[i];
   fse[1] = impl_func(xs1,par);
@@ -346,7 +347,7 @@ vofi_int vofi_get_face_min(integrand impl_func,vofi_void_cptr par,
         d2f1 = d2f2 = 1.;
       delold = delnew;
       delmid = delnew = 0.;
-      for (i=0;i<=2;i++) {
+      for (i=0;i<NDIM;i++) {
         res[i] = rs0[i] + df1*dir1[i] + df2*dir2[i];
         delmid += res[i]*pcrs[i];
         hes[i] = hs0[i] + d2f1*dir1[i] + d2f2*dir2[i];
@@ -367,16 +368,21 @@ vofi_int vofi_get_face_min(integrand impl_func,vofi_void_cptr par,
         mcd += cndr[i]*cndr[i];  
       }  
       mcd = sqrt(mcd + EPS_NOT0); 
-      for (i=0;i<NDIM;i++) {          
+      for (i=0;i<NDIM;i++) {
         nmdr[i] = cndr[i]/mcd;                   /* - */
         d1 = SGN0P(nmdr[i]);
         d2 = fabs(nmdr[i]) + EPS_NOT0;
-        a1 = (x0[i] - xs0[i])/(d1*d2);
-        a2 = (x0[i] + h0[i] - xs0[i])/(d1*d2);
-        ss[i] = MAX(a1,a2);
+        if (d2 < EPS_ROOT)
+          ss[i] = SS_FREE;               /* - */
+        else {
+          a1 = (x0[i] - xs0[i])/(d1*d2);
+          a2 = (x0[i] + h0[i] - xs0[i])/(d1*d2);
+          ss[i] = MAX(a1,a2);
+        }
       }
-      ss1 = MIN(ss[0],ss[1]);
-      ss1 = MIN(ss1,ss[2]);             
+      ss1 = ss[0];
+      for (i=1;i<NDIM;i++)
+        ss1 = MIN(ss1,ss[i]);
       ss0 = MIN(1.2*ss0,ss1);
 
       /* - */
